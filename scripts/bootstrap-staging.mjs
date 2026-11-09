@@ -46,7 +46,9 @@ export function stagingTarget(env) {
 function migrationPlan() {
   const digest = createHash('sha256');
   const plan = files.map(file => {
-    let source = readFileSync(new URL('../db/' + file, import.meta.url), 'utf8').replaceAll('\r\n', '\n');
+    let source = readFileSync(new URL('../db/' + file, import.meta.url), 'utf8')
+      .replace(/^\uFEFF/, '')
+      .replaceAll('\r\n', '\n');
     digest.update(file + '\n' + source + '\n');
     if (file.startsWith('manual-migrations/')) {
       if (!/^BEGIN;$/m.test(source) || !/\nCOMMIT;\s*$/.test(source)) throw new BootstrapError('Bọc giao dịch của SQL Better Auth đã thay đổi.');
