@@ -130,7 +130,7 @@ export async function bootstrapStaging(client, { mode, database }, report = cons
   }
 }
 
-async function main() {
+async function runFromEnvironment() {
   const target = stagingTarget(process.env);
   if (!target) return;
   const client = new pg.Client({ connectionString: target.connectionString, connectionTimeoutMillis: 8000 });
@@ -142,10 +142,18 @@ async function main() {
   }
 }
 
-if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
-  main().catch(error => {
+let startup;
+export function runStagingBootstrap() {
+  startup ??= runFromEnvironment().catch(error => {
     const code = /^[A-Z0-9_]+$/.test(error.code ?? '') ? error.code : 'UNKNOWN';
-    console.error('[staging-bootstrap] ' + (error instanceof BootstrapError ? error.message : `Không thể kiểm tra PostgreSQL (mã ${code}).`));
+    throw new BootstrapError(error instanceof BootstrapError ? error.message : `Không thể kiểm tra PostgreSQL (mã ${code}).`);
+  });
+  return startup;
+}
+
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  runStagingBootstrap().catch(error => {
+    console.error('[staging-bootstrap] ' + error.message);
     process.exitCode = 1;
   });
 }

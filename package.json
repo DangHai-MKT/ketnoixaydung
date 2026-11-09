@@ -12,8 +12,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit",
-    "prestart": "node scripts/bootstrap-staging.mjs"
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [],
   "author": "",
