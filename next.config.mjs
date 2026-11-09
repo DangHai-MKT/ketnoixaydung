@@ -16,6 +16,10 @@ const config = isolatedAuthTest ? {
 } : {};
 
 export default async function nextConfig(phase) {
+  if (phase === nextConstants.PHASE_PRODUCTION_SERVER && process.env.STAGING_ADMIN_BOOTSTRAP) {
+    const { runStagingAdminBootstrap } = await import('./scripts/bootstrap-staging-admin.mjs');
+    await runStagingAdminBootstrap();
+  }
   if (phase === nextConstants.PHASE_PRODUCTION_SERVER && process.env.STAGING_BOOTSTRAP) {
     const { runStagingBootstrap } = await import('./scripts/bootstrap-staging.mjs');
     try {
