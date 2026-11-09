@@ -1,0 +1,11 @@
+import type { AdminReport } from '../services/admin-report';
+import { formatPoints } from '../lib/projects/workflow';
+export default function AdminReportChart({ finance }: { finance: AdminReport['finance'] }) {
+  if (!finance) return <div className="ar-no-access"><p>Cần quyền tài chính để xem báo cáo giao dịch.</p></div>;
+  const series = finance.series, maxPoints = series.reduce((n, row) => BigInt(row.gross) > n ? BigInt(row.gross) : n, 0n), maxCount = Math.max(1, ...series.map(row => row.count));
+  const height = (value: string) => maxPoints ? Number(BigInt(value) * 10000n / maxPoints) / 100 : 0;
+  const line = series.map((row, index) => `${series.length === 1 ? 50 : index / (series.length - 1) * 100},${100 - row.count / maxCount * 95}`).join(' ');
+  const step = Math.max(1, Math.ceil(series.length / 12));
+  return <><div className="ar-chart-legend"><span><i className="ar-blue" />Phí nền tảng theo đơn</span><span><i className="ar-orange" />Giá trị giao dịch</span><span><i className="ar-line-dot" />Số lượng giao dịch</span></div><div className="ar-chart"><div className="ar-chart-y"><small>POINT</small>{[4, 3, 2, 1, 0].map(n => <span key={n}>{formatPoints(maxPoints * BigInt(n) / 4n)}</span>)}</div><div className="ar-chart-main"><div className="ar-chart-grid" /><div className="ar-bar-groups">{series.map((row, index) => <div className="ar-bar-group" key={index}><span className="ar-two-bars" title={`${row.label}: ${formatPoints(row.gross)} POINT · phí ${formatPoints(row.fees)} POINT · ${row.count} đơn`}><i style={{ height: `${height(row.fees)}%` }} /><i style={{ height: `${height(row.gross)}%` }} /></span><small>{index % step === 0 || index === series.length - 1 ? row.label : ''}</small></div>)}</div>{finance.count > 0 && <svg className="ar-chart-line" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polyline points={line} fill="none" stroke="#0648c8" strokeWidth="1.8" vectorEffect="non-scaling-stroke" /></svg>}{!finance.count && <p className="ar-chart-empty">Chưa có giao dịch hoàn tất trong khoảng thời gian này</p>}</div><div className="ar-chart-y ar-chart-y-right"><small>Số đơn</small>{[4, 3, 2, 1, 0].map(n => <span key={n}>{Math.round((finance.count ? maxCount : 0) * n / 4)}</span>)}</div></div><p className="ar-chart-note">Tính theo ngày hoàn tất và phí ghi trên đơn, không thay thế báo cáo sổ cái.</p></>;
+}
+

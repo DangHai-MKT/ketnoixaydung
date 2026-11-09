@@ -1,0 +1,2 @@
+import {projectLabels} from '../lib/projects/workflow';
+export default function ProjectStatusBadge({status,submissionStatus}:{status:string;submissionStatus?:string|null}){return <span className="p2-statuses"><span className={`p2-badge p2-${status}`}>{status==='published'?'Đang công bố':projectLabels[status]||status}</span>{submissionStatus&&submissionStatus!==status&&<span className={`p2-badge p2-${submissionStatus}`}>Bản đề xuất: {projectLabels[submissionStatus]||submissionStatus}</span>}</span>;}

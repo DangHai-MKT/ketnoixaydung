@@ -1,0 +1,10 @@
+import {AccessError} from '../auth/permissions';
+export const lifecycleScopes={payments:'Nạp POINT',purchases:'Mua dự án',earnings:'Thu nhập',refunds:'Hoàn POINT',disputes:'Tranh chấp',withdrawals:'Chi trả',ledger:'Sổ cái'} as const;
+export type LifecycleScope=keyof typeof lifecycleScopes;
+export type Finding={code:string;level:'review'|'attention';message:string};
+export const lifecycleStates={verified:'Khớp dữ liệu và bút toán',pending:'Chờ bước nghiệp vụ',attention:'Cần nhân sự theo dõi',review:'Cần đối soát sai lệch'} as const;
+export function lifecycleQuery(p:URLSearchParams){for(const k of p.keys())if(!['scope','page','id'].includes(k)||p.getAll(k).length!==1)throw new AccessError(400,'Bộ lọc đối soát không hợp lệ.');const scope=p.get('scope')||'payments',page=p.get('page')||'1',id=p.get('id')||'';if(!Object.hasOwn(lifecycleScopes,scope)||! /^[1-9]\d{0,3}$/.test(page)||id&&! /^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(id)||id&&page!=='1')throw new AccessError(400,'Chọn nhóm nghiệp vụ, trang hoặc mã hồ sơ hợp lệ.');return {scope:scope as LifecycleScope,page:Number(page),id};}
+export type LifecycleQuery=ReturnType<typeof lifecycleQuery>;
+export function lifecycleState(findings:Finding[],pending=false){return findings.some(f=>f.level==='review')?'review':findings.length?'attention':pending?'pending':'verified';}
+export function exactMirror(original:{id:string;walletId:string;amount:bigint}[],reversed:{reversalOfEntryId:string|null;walletId:string;amount:bigint}[]){return original.length>=2&&original.length===reversed.length&&original.every(e=>reversed.filter(r=>r.reversalOfEntryId===e.id&&r.walletId===e.walletId&&r.amount===-e.amount).length===1);}
+export function lifecycleLink(scope:LifecycleScope,id:string){return scope==='payments'?'/admin/payments/'+id:scope==='refunds'?'/admin/refunds/'+id:scope==='disputes'?'/admin/disputes/'+id:scope==='withdrawals'?'/admin/withdrawals/'+id:scope==='ledger'?'/admin/transactions/'+id:'/admin/reconciliation?'+new URLSearchParams({scope,id});}

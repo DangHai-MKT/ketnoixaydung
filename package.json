@@ -1,0 +1,40 @@
+{
+  "name": "construction-marketplace-drizzle",
+  "version": "1.0.0",
+  "description": "- `docs/ERD.md`: ERD, relationships and integrity rules. - `docs/MIGRATION-REVIEW.md`: change log and validation status. - `db/schema/index.ts`: Drizzle schema including payout accounts and idempotency fields. - `db/migrations/0000_initial.sql`: initial PostgreSQL schema. - `db/migrations/0001_hardening.sql`: additive hardening migration. - `db/migrations/meta/_journal.json`: migration journal. - `tests/smoke.sql`: PostgreSQL smoke test for ledger balancing and immutability. - `scripts/verify-migration.sh`: applies migrations and smoke test on a disposable DB.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "better-auth": "^1.7.14",
+    "dotenv": "18.0.8",
+    "drizzle-orm": "0.45.4",
+    "next": "^16.4.3",
+    "pg": "8.23.1",
+    "qrcode": "^1.5.4",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "sharp": "0.35.5"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "@types/pg": "8.23.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "drizzle-kit": "0.31.11",
+    "typescript": "5.9.3"
+  }
+}

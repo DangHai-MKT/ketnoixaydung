@@ -1,0 +1,8 @@
+import type { FinanceSummary } from './DashboardPanels';
+import { DashboardPanel } from './DashboardPanels';
+import { formatPoints } from '../lib/projects/workflow';
+export default function SellerRevenueChart({ finance }: { finance: FinanceSummary }) {
+  const maximum = finance.months.reduce((max, row) => BigInt(row.points) > max ? BigInt(row.points) : max, 0n);
+  const average = finance.completed ? BigInt(finance.points) / BigInt(finance.completed) : 0n;
+  return <section id="seller-revenue"><DashboardPanel title="Giá trị bán theo thời gian" className="dash-chart-panel"><span className="dash-chart-period">6 tháng gần đây · POINT</span><div className="dash-chart-layout"><div className="dash-chart"><div className="dash-chart-axis">{[5,4,3,2,1,0].map(n=><span key={n}>{formatPoints(maximum*BigInt(n)/5n)}</span>)}</div><div className="dash-chart-bars">{finance.months.map((row,index)=><div key={index}><span className="dash-chart-bar-track"><span title={`${row.label}: ${formatPoints(row.points)} POINT sau phí`} style={{height:maximum?`${Number(BigInt(row.points)*10000n/maximum)/100}%`:'0%'}} /></span><small>{row.label}</small></div>)}</div>{!maximum&&<p className="dash-chart-empty">Chưa có đơn hoàn tất trong 6 tháng gần đây</p>}</div><dl className="dash-chart-summary"><dt>Tổng giá trị sau phí</dt><dd>{formatPoints(finance.points)} <small>POINT</small></dd><dt>Số đơn hoàn tất</dt><dd>{finance.completed.toLocaleString('vi-VN')}</dd><dt>Trung bình / đơn hoàn tất</dt><dd>{formatPoints(average.toString())} <small>POINT</small></dd></dl></div><p className="dash-muted">Biểu đồ: 6 tháng gần đây. Tổng và trung bình: toàn thời gian, sau phí; không phải số dư có thể rút.</p></DashboardPanel></section>;
+}

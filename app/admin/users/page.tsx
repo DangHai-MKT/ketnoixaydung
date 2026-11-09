@@ -1,0 +1,19 @@
+import {verificationLabels} from '../../../lib/account/labels';
+import { requirePageActor } from '../../../lib/auth/server';
+import RoleGrantForm from '../../../components/RoleGrantForm';
+import { DashboardPanel } from '../../../components/DashboardPanels';
+import { getAdminDirectory } from '../../../services/admin-directory';
+import { AdminReportInputError } from '../../../lib/dashboard/admin-report';
+import { roles } from '../../../lib/auth/permissions';
+export default async function AdminUsersPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const actor = await requirePageActor('/admin/users', ['super_admin']);
+  let result;
+  try { result = await getAdminDirectory(actor, await searchParams); }
+  catch (error) { if (error instanceof AdminReportInputError) return <main><h1>Bộ lọc không hợp lệ</h1><p>{error.message}</p><a href="/admin/users">Về danh sách</a></main>; throw error; }
+  const pageLink = (page: number) => `?${new URLSearchParams({role:result.role,q:result.q,status:result.state,page:String(page)})}`;
+  return <main><div className="dash-page-heading"><h1>Quản lý người dùng</h1><p>Tra cứu tài khoản, xác thực người dùng thủ công và quản lý vai trò theo thẩm quyền. Không hiển thị mật khẩu hoặc token.</p></div><DashboardPanel title="Danh sách tài khoản" icon="users"><form className="seller-filter" method="get"><label>Từ khóa <input name="q" defaultValue={result.q} maxLength={80} placeholder="Tên, email, mã người dùng" /></label><label>Vai trò <select name="role" defaultValue={result.role}><option value="">Tất cả</option>{roles.map(role=><option key={role}>{role}</option>)}</select></label><label>Trạng thái<select name="status" defaultValue={result.state}><option value="">Tất cả</option><option value="active">Đang hoạt động</option><option value="suspended">Tạm khóa</option><option value="closed">Đã đóng</option></select></label><button className="dash-outline">Tìm kiếm</button></form><p className="dash-muted">{result.total.toLocaleString('vi-VN')} tài khoản phù hợp. Vai trò buyer và seller có thể cùng thuộc một người dùng.</p><div className="ar-table-scroll"><table className="ar-directory"><thead><tr><th>Tên / mã tài khoản</th><th>Email</th><th>Vai trò</th><th>Email / hồ sơ người bán</th><th>Đăng ký</th><th>Đăng nhập gần nhất</th><th>Trạng thái</th></tr></thead><tbody>{result.rows.map(user=><tr key={user.id}><td><a href={`/admin/users/${user.id}`}><strong>{user.name}</strong></a><small className="ar-user-id">{user.id}</small>{user.status==='active'&&user.id!==actor.id&&<a href={`/admin/users/${user.id}#account-verification`} className="ar-user-id">Xác thực người dùng →</a>}</td><td>{user.email}</td><td>{user.roles.join(', ')}</td><td>{user.emailVerified ? 'Email đã xác minh' : 'Email chưa xác minh'}<small className="ar-user-id">Seller: {user.sellerStatus ? verificationLabels[user.sellerStatus] || 'Chưa xác minh' : 'Chưa đăng ký'}</small></td><td>{user.createdAt.toLocaleDateString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'})}</td><td>{user.lastLoginAt ? user.lastLoginAt.toLocaleString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh'}) : 'Chưa ghi nhận'}</td><td>{user.status === 'active' ? 'Đang hoạt động' : user.status === 'suspended' ? 'Tạm khóa' : 'Đã đóng'}</td></tr>)}{!result.rows.length&&<tr><td colSpan={7}>Không có tài khoản phù hợp.</td></tr>}</tbody></table></div><nav className="dash-inline-actions" aria-label="Phân trang người dùng">{result.page>1&&<a className="dash-outline" href={pageLink(result.page-1)}>Trang trước</a>}{result.page*20<result.total&&<a className="dash-outline" href={pageLink(result.page+1)}>Trang sau</a>}</nav></DashboardPanel><section id="grant-role"><DashboardPanel title="Cấp thêm vai trò" icon="users"><p className="dash-muted">Chỉ cấp cho tài khoản khác đang hoạt động. Không tự cấp quyền. Buyer được giữ lại; seller vẫn cần hồ sơ xác minh.</p><RoleGrantForm /></DashboardPanel></section></main>;
+}
+
+
+
+

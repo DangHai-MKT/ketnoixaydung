@@ -1,0 +1,11 @@
+.load-more { display: grid; justify-items: center; gap: .6rem; padding: 1.5rem 0 .55rem; }
+.load-more button {
+  display: inline-flex; justify-content: center; align-items: center; gap: .4rem;
+  min-height: 2.9rem; width: min(100%, 17rem); padding: .5rem .8rem; cursor: pointer;
+  border: 1px solid #4485d6; border-radius: .55rem; background: #fff; color: #0c56a3;
+  font: inherit; font-weight: 650;
+}
+.load-more button:hover { background: #eff6ff; }
+.load-more button:focus-visible { outline: 2px solid #1655a1; outline-offset: 3px; }
+.load-more button:disabled { cursor: wait; opacity: .7; }
+.load-more p { margin: 0; color: #a72b2b; text-align: center; }

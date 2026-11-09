@@ -1,0 +1,2 @@
+export const verificationLabels:Record<string,string>={unverified:'Chưa xác minh',pending:'Chờ xét duyệt',verified:'Đã xác minh',rejected:'Bị từ chối',suspended:'Tạm đình chỉ'};
+export const roleLabels:Record<string,string>={buyer:'Người mua',seller:'Người bán',content_moderator:'Kiểm duyệt nội dung',finance_operator:'Vận hành tài chính',support_operator:'Hỗ trợ khách hàng',super_admin:'Quản trị hệ thống'};

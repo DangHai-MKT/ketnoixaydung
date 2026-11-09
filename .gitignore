@@ -1,0 +1,59 @@
+﻿# Dependencies
+node_modules/
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Build and tool output
+dist/
+build/
+coverage/
+.turbo/
+.cache/
+*.tsbuildinfo
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+*.log
+
+# Local editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local database backup; do not commit
+/backups/construction_marketplace_20261018_145524.dump
+
+# Next.js
+.next/
+.next-auth-test/
+.next-seller-test/
+.next-project-test/
+.next-settings-test/
+.next-cms-integration/
+.next-email-preview/
+.next-watch-preview/
+/tmp/project-test-files/
+.private/
+/tmp/seller-test-files/
+out/
+next-env.d.ts
+
+/tmp/identity-test-mail/
+/tmp/purchase-ui/
+/tmp/topup-ui/
+/tmp/earnings-ui/
+/tmp/build-cache-backups/
+
+/tmp/dispute-test-files/
+
+/tmp/payout-test-files/

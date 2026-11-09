@@ -1,0 +1,7 @@
+import {disputeActor,disputeRequest} from '../../../../../lib/finance/dispute-http';
+import {privateJson,readBoundedBody} from '../../../../../lib/seller/http';
+import {accessErrorResponse,requireSameOrigin} from '../../../../../lib/auth/server';
+import {AccessError} from '../../../../../lib/auth/permissions';
+import {uploadDisputeEvidence} from '../../../../../services/disputes';
+export const runtime='nodejs';
+export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){try{requireSameOrigin(request);const {mode}=disputeRequest(request),actor=await disputeActor(request,mode),body=await readBoundedBody(request,6*1024*1024);let form:FormData;try{form=await new Response(new Uint8Array(body),{headers:{'Content-Type':request.headers.get('content-type')||''}}).formData();}catch{throw new AccessError(400,'Dữ liệu tải lên không hợp lệ.');}for(const k of form.keys())if(!['file','caption','expectedRevision','idempotencyKey'].includes(k)||form.getAll(k).length!==1)throw new AccessError(400,'Trường tải lên không hợp lệ.');const file=form.get('file'),revision=form.get('expectedRevision');if(!(file instanceof File)||typeof revision!=='string'||! /^[1-9]\d{0,8}$/.test(revision))throw new AccessError(400,'Thiếu ảnh hoặc phiên bản hồ sơ.');return privateJson(await uploadDisputeEvidence(actor,(await params).id,mode,{file,caption:form.get('caption'),expectedRevision:Number(revision),idempotencyKey:form.get('idempotencyKey')}));}catch(e){return accessErrorResponse(e);}}

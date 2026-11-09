@@ -1,0 +1,1 @@
+export default function PublicNotFound() { return <main className="account-page"><h1>Không tìm thấy nội dung</h1><p>Nội dung chưa được công bố hoặc không còn khả dụng.</p><a href="/projects">Tìm dự án khác →</a></main>; }
