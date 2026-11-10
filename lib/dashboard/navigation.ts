@@ -47,6 +47,7 @@ export function dashboardNavigation(mode: DashboardMode, roles: readonly Role[],
       { label: 'Thông báo', href: '/admin/notifications', icon: 'bell' }, { label: 'Cài đặt tài khoản', href: '/admin/profile', icon: 'settings' }];
   }
   return [{ label: 'Tổng quan', href: '/account', icon: 'civil' },
+    ...(sellerEnabled ? sellerLinks : []),
     ...(showProjectWatch?[{label:'Theo dõi dự án',href:'/account/project-watch',icon:'bell'}]:[]),
     { label: 'Mua thông tin', href: '/account/purchases', icon: 'file', children: [
       { label: 'Dự án đã mua', href: '/account/purchases' }, { label: 'Dự án yêu thích', href: '#favorites', disabled: true },
@@ -59,7 +60,7 @@ export function dashboardNavigation(mode: DashboardMode, roles: readonly Role[],
       { label: 'Lịch sử ví', href: '/account/wallet/transactions' },
       { label: 'Ưu đãi & khuyến mãi', href: '#promotions', disabled: true },
     ] },
-    ...(sellerEnabled ? sellerLinks : [
+    ...(sellerEnabled ? [] : [
       { label: 'Đăng ký hoặc theo dõi hồ sơ nhà cung cấp', href: '/become-seller', icon: 'commercial' },
     ]), { label: 'Góp ý trải nghiệm', href: '/feedback', icon: 'help' }, ...common];
 }

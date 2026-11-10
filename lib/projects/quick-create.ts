@@ -5,6 +5,6 @@ export const areaOptions=[{label:'Dưới 1.000 m²',min:'',max:'1000'},{label:'
 export const rightsOptions=['Tôi là chủ sở hữu/đại diện được ủy quyền và được phép cung cấp thông tin này.','Tôi đã được chủ sở hữu cho phép chia sẻ thông tin và tài liệu trên nền tảng.','Tôi có quyền sử dụng và chia sẻ các nguồn thông tin, tài liệu được khai báo.'];
 export const suggestedProjectPrice='100';
 export const quickPrices=[suggestedProjectPrice,'250','500','1000'];
-export function quickProjectTemplate(category:string){const type=constructionOptions[category]?.[0]||constructionOptions.other[0];return {category,constructionType:type,title:'Dự án '+type.toLowerCase(),publicSummary:'[Cần bổ sung: mô tả khái quát dự án được phép công khai.]\n[Cần bổ sung: quy mô, giai đoạn và nhu cầu kết nối.]',technicalSummary:''};}
+export function quickProjectTemplate(category:string){const type=constructionOptions[category]?.[0]||constructionOptions.other[0];return {category,constructionType:type,title:'Dự án '+type.toLowerCase(),technicalSummary:''};}
 export function fillEmptyProjectFields<T extends Record<string,string>>(current:T,template:Partial<T>):T{const next={...current};for(const [key,value]of Object.entries(template))if(typeof value==='string'&&!current[key]?.trim())next[key as keyof T]=value as T[keyof T];return next;}
 export function templateIssues(values:unknown[]){return values.some(v=>typeof v==='string'&&/\[Cần bổ sung:/i.test(v))?['Hoàn thiện các mục “Cần bổ sung” trong mẫu trước khi gửi duyệt.']:[];}

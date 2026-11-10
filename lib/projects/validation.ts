@@ -61,7 +61,6 @@ export function autoCheck(input: ProjectInput, files: { accessLevel: string; mim
   errors.push(...projectPrivacyIssues(input,input.privateData));
   errors.push(...templateIssues([input.title,input.publicSummary,input.publicData.constructionType,input.publicData.technicalSummary,input.publicData.scopeSummary]));
   if (input.title.length < 5) errors.push('Tên dự án cần tối thiểu 5 ký tự.');
-  if (input.publicSummary.length < 20) errors.push('Mô tả công khai cần tối thiểu 20 ký tự.');
   if (!input.provinceCode) errors.push('Cần bổ sung tỉnh/thành.');
   if (!input.projectStage) errors.push('Cần bổ sung giai đoạn dự án.');
   if (!Object.entries(input.privateData).some(([key, field]) => key !== 'projectReference' && key !== 'packageScope' && (typeof field === 'string' ? field.trim() : field.length))) errors.push('Cần có thông tin bảo vệ có giá trị cho người mua.');
