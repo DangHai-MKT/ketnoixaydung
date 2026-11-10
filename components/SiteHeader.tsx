@@ -25,10 +25,6 @@ export default function SiteHeader() {
         {links}
       </nav>
       <div className="header-account"><a className="header-search" href="/projects" aria-label="Tìm kiếm dự án"><Icon name="search" size={21} /></a><AccountNavigation /><span className="header-language" aria-label="Ngôn ngữ: Tiếng Việt"><span>★</span> VI</span></div>
-      <details className="site-mobile-nav">
-        <summary>Điều hướng</summary>
-        <nav aria-label="Điều hướng chính">{links}</nav>
-      </details>
     </header>
   );
 }
