@@ -30,6 +30,7 @@
 .notice-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: .45rem; }
 .notice-title h2 { font-size: 1.02rem; margin: 0; }
 .notice-title > span { background: #deebff; color: #153e74; border-radius: 999px; padding: .18rem .42rem; font-size: .78rem; }
+.notice-title > .notice-read { background: #eef2f6; color: #46586d; }
 .notice-copy p { margin: .35rem 0; line-height: 1.5; }
 .notice-copy time,.notice-popover time { color: #49617e; font-size: .82rem; }
 .notice-actions { margin-top: .4rem; }

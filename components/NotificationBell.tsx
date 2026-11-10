@@ -3,6 +3,7 @@
 import {useEffect,useId,useRef,useState} from 'react';
 import {formatNotificationDate,type NotificationPage} from '../lib/notifications/contracts';
 import Icon from './MarketplaceIcon';
+import NotificationLink from './NotificationLink';
 
 export default function NotificationBell({href,unread,onUnread}:{href:string;unread:number;onUnread:(count:number)=>void}) {
   const [open,setOpen]=useState(false),[data,setData]=useState<NotificationPage|null>(null),[error,setError]=useState('');
@@ -37,8 +38,10 @@ export default function NotificationBell({href,unread,onUnread}:{href:string;unr
         !data?<p role="status">Đang tải thông báo…</p>:!data.rows.length?<p>Chưa có thông báo.</p>:
         <ul>{data.rows.map(row=><li key={row.id} className={!row.readAt?'notice-unread':undefined}>
           <div>{!row.readAt&&<span className="notice-dot" aria-label="Chưa đọc"/>}
-            {row.href?<a href={row.href}>{row.title}</a>:<strong>{row.title}</strong>}</div>
-          <time dateTime={row.createdAt}>{formatNotificationDate(row.createdAt)}</time>
+            {row.href?<NotificationLink id={row.id} href={row.href} readAt={row.readAt} onRead={result=>setData(current=>current&&({
+              ...current,unread:result.unread,rows:current.rows.map(item=>item.id===row.id?{...item,readAt:result.readAt??new Date().toISOString()}:item),
+            }))}>{row.title}</NotificationLink>:<strong>{row.title}</strong>}</div>
+          <time dateTime={row.createdAt}>{formatNotificationDate(row.createdAt)}</time>{row.readAt&&<small> · Đã xem</small>}
         </li>)}</ul>}
       <footer><a href={href} onClick={()=>setOpen(false)}>Xem tất cả thông báo →</a></footer>
     </section>}
