@@ -31,6 +31,7 @@ export default function SellerApplicationForm({ mode }: { mode: 'edit' | 'status
     if (value) for (const key of Object.keys(next) as (keyof Fields)[]) Object.assign(next, { [key]: value.profile[key] ?? '' });
     setFields(next); setDirty(false); setFailedLoad(false);
     setStep(current => current === 1 && value ? (editable(value.state) ? 2 : 5) : current);
+    return value;
   }, []);
   useEffect(() => {
     const controller = new AbortController();
@@ -58,7 +59,8 @@ export default function SellerApplicationForm({ mode }: { mode: 'edit' | 'status
   const keys = (Object.keys(labels) as (Exclude<keyof Fields, 'sellerType'>)[]).filter((key) => fields.sellerType === 'business' || !['businessRegistrationNo', 'taxCode', 'authorizedRepresentative'].includes(key));
   return <div className="seller-workspace identity-seller">
     {mode === 'edit' && <nav className="identity-steps" aria-label="Tiến trình hồ sơ">{['Loại người bán','Thông tin','Tài liệu','Kiểm tra','Theo dõi'].map((label,index)=><span key={label} aria-current={step===index+1?'step':undefined}><b>{index+1}</b>{label}</span>)}</nav>}
-    {application && <SellerApplicationStatus application={application} />}
+    {application && (!editing || step === 5) && <SellerApplicationStatus application={application} />}
+    {editing && application?.profile.reviewReason && <p className="seller-feedback"><strong>Phản hồi xét duyệt</strong><br />{application.profile.reviewReason}</p>}
     {!application && mode === 'status' && <p>Bạn chưa có hồ sơ. <a href="/seller/register">Đăng ký người bán</a></p>}
     {mode === 'status' && application && canEdit && <p><a className="button button-primary" href="/seller/register">Chỉnh sửa và bổ sung hồ sơ</a></p>}
     {application?.state === 'verified' && <p><a href="/seller">Mở khu vực người bán</a></p>}
@@ -73,10 +75,26 @@ export default function SellerApplicationForm({ mode }: { mode: 'edit' | 'status
         </form>
       </section>
       {application && <>
-        <div hidden={step !== 3}><SellerDocumentUpload application={application} disabled={dirty || pending} onBusy={setDocumentBusy} onSaved={async () => { await load(); setNotice('Đã lưu tài liệu riêng tư.'); }} /><div className="identity-actions"><button type="button" className="button button-secondary" disabled={pending||documentBusy} onClick={()=>setStep(2)}>← Thông tin</button><button type="button" className="button button-primary" disabled={pending||documentBusy||dirty} onClick={()=>setStep(4)}>Kiểm tra hồ sơ →</button></div></div>
+        <div hidden={step !== 3}>
+          <SellerDocumentUpload key={application.profile.sellerType} application={application} disabled={dirty || pending}
+            onBusy={setDocumentBusy} onBack={() => setStep(2)}
+            onContinue={async (uploaded, requiredType) => {
+              const current = uploaded ? await load() : application;
+              if (!current?.documents.some((doc) => doc.documentType === requiredType)) return false;
+              setNotice(uploaded ? 'Đã lưu tài liệu riêng tư.' : '');
+              setStep(4);
+              return true;
+            }}
+          />
+        </div>
         <section hidden={step !== 4}><h2>Kiểm tra trước khi gửi</h2><dl className="identity-details">{keys.map(key=><div key={key}><dt>{labels[key]}</dt><dd>{fields[key]||'Chưa cung cấp'}</dd></div>)}</dl><p>{application.documents.length} tài liệu riêng tư đã lưu.</p><button type="button" className="identity-text-button" disabled={pending||documentBusy} onClick={()=>setStep(3)}>← Quay lại tài liệu</button><h2>Gửi xét duyệt</h2><p>Sau khi gửi, thông tin và tài liệu được khóa trong thời gian xét duyệt. Chỉ gửi tài liệu bạn có quyền cung cấp.</p>
           <button type="button" className="button button-primary" disabled={pending || documentBusy || dirty || application.missing.length > 0} onClick={() => void mutate('/api/seller/application/submit', 'POST', { revision: application.profile.revision }, 'Đã gửi hồ sơ. Bạn có thể theo dõi tại trang trạng thái.')}>{pending ? 'Đang xử lý…' : 'Gửi hồ sơ xét duyệt'}</button>
           {dirty && <p>Hãy lưu thay đổi trước khi gửi.</p>}
+          {application.missing.length > 0 && <div className="seller-feedback">
+            <strong>Hồ sơ còn thiếu</strong>
+            <ul>{application.missing.map((item) => <li key={item}>{item}</li>)}</ul>
+            <button type="button" className="identity-text-button" disabled={pending} onClick={() => setStep(2)}>← Bổ sung thông tin</button>
+          </div>}
         </section>
       </>}
     </>}
