@@ -54,8 +54,11 @@ export default function ProjectFilterDialog({dialogRef,queryString,onApply,onClo
           </div>
         </fieldset>
         <fieldset className="p2-filter-fields"><legend>Khu vực và giai đoạn</legend>
-          <label>Tỉnh / thành<input value={filters.province} list="project-filter-provinces" maxLength={20} placeholder="Chọn hoặc nhập tỉnh / thành" onChange={event=>update({province:event.target.value})}/>
-            <datalist id="project-filter-provinces">{provinceOptions.map(value=><option key={value} value={value}/>)}</datalist></label>
+          <label>Tỉnh / thành<select value={filters.province} onChange={event=>update({province:event.target.value})}>
+            <option value="">Toàn quốc</option>
+            {filters.province && !provinceOptions.includes(filters.province) && <option value={filters.province}>{filters.province}</option>}
+            {provinceOptions.map(value=><option key={value} value={value}>{value}</option>)}
+          </select></label>
           <label>Giai đoạn<input value={filters.stage} list="project-filter-stages" maxLength={80} placeholder="Chọn hoặc nhập giai đoạn" onChange={event=>update({stage:event.target.value})}/>
             <datalist id="project-filter-stages">{stageOptions.map(value=><option key={value} value={value}/>)}</datalist></label>
         </fieldset>
