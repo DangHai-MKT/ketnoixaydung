@@ -1,11 +1,12 @@
-// Current provincial names, in the order of Decision 19/2025/QĐ-TTg.
+// Frequently selected cities first, followed by the remaining entries of Decision 19/2025/QĐ-TTg.
 export const provinceOptions = [
-  'Hà Nội', 'Cao Bằng', 'Tuyên Quang', 'Điện Biên', 'Lai Châu', 'Sơn La',
+  'Hà Nội', 'TP. Hồ Chí Minh', 'Đà Nẵng', 'Hải Phòng', 'Cần Thơ', 'Huế',
+  'Cao Bằng', 'Tuyên Quang', 'Điện Biên', 'Lai Châu', 'Sơn La',
   'Lào Cai', 'Thái Nguyên', 'Lạng Sơn', 'Quảng Ninh', 'Bắc Ninh', 'Phú Thọ',
-  'Hải Phòng', 'Hưng Yên', 'Ninh Bình', 'Thanh Hóa', 'Nghệ An', 'Hà Tĩnh',
-  'Quảng Trị', 'Huế', 'Đà Nẵng', 'Quảng Ngãi', 'Gia Lai', 'Khánh Hòa',
-  'Đắk Lắk', 'Lâm Đồng', 'Đồng Nai', 'TP. Hồ Chí Minh', 'Tây Ninh',
-  'Đồng Tháp', 'Vĩnh Long', 'An Giang', 'Cần Thơ', 'Cà Mau',
+  'Hưng Yên', 'Ninh Bình', 'Thanh Hóa', 'Nghệ An', 'Hà Tĩnh',
+  'Quảng Trị', 'Quảng Ngãi', 'Gia Lai', 'Khánh Hòa',
+  'Đắk Lắk', 'Lâm Đồng', 'Đồng Nai', 'Tây Ninh',
+  'Đồng Tháp', 'Vĩnh Long', 'An Giang', 'Cà Mau',
 ];
 
 // Historical values remain on listings and in existing links.

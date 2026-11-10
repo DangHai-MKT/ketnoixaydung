@@ -15,8 +15,12 @@ import {projectPrivacyIssues} from '../lib/projects/privacy';
 import ConfirmActionDialog from './ConfirmActionDialog';
 import ProjectPriceSuggestion from './ProjectPriceSuggestion';
 import {areaOptions,constructionOptions,fillEmptyProjectFields,provinceOptions,quickPrices,quickProjectTemplate,rightsOptions,stageOptions,templateIssues} from '../lib/projects/quick-create';
+import { provinceLabel } from '../lib/projects/locations';
+// Snapshot of the 2025 register from https://provinces.open-api.vn/api/v2/?depth=2.
+import vietnamWards from '../lib/projects/vietnam-wards.json';
+const wardsByProvince: Readonly<Record<string, readonly string[]>> = vietnamWards;
 const empty={title:'',category:'industrial',provinceCode:'',districtName:'',projectStage:'',sizeMinSqm:'',sizeMaxSqm:'',publicSummary:'',constructionType:'',technicalSummary:'',scopeSummary:'',pricePoints:'1000',rightsDeclaration:''};
-const labels:Record<string,string>={title:'Tên dự án',provinceCode:'Tỉnh / thành',districtName:'Quận / huyện hoặc khu vực chung',projectStage:'Giai đoạn dự án',sizeMinSqm:'Diện tích tối thiểu (m²)',sizeMaxSqm:'Diện tích tối đa (m²)',constructionType:'Loại công trình'};
+const labels:Record<string,string>={title:'Tên dự án',provinceCode:'Tỉnh / thành',districtName:'Phường / xã',projectStage:'Giai đoạn dự án',sizeMinSqm:'Diện tích tối thiểu (m²)',sizeMaxSqm:'Diện tích tối đa (m²)',constructionType:'Loại công trình'};
 type Command={name:string;title:string;description:string;fileId?:string;href?:string};
 export default function ProjectEditor({id,mode='edit',versionId,initialStep=1}:{id?:string;mode?:'edit'|'status';versionId?:string;initialStep?:number}){
  const router=useRouter(),creationKey=useRef('');
@@ -42,7 +46,9 @@ export default function ProjectEditor({id,mode='edit',versionId,initialStep=1}:{
  function updateFields(values:Partial<typeof empty>){setFields(current=>({...current,...values}));setDirty(true);}
  const {category,provinceCode,projectStage,constructionType,sizeMinSqm,sizeMaxSqm}=fields;
  const priceContext={category,provinceCode,projectStage,constructionType,sizeMinSqm,sizeMaxSqm};
- const choices:Partial<Record<keyof typeof empty,string[]>>={provinceCode:provinceOptions,projectStage:stageOptions,constructionType:constructionOptions[category]};
+ const choices:Partial<Record<keyof typeof empty,string[]>>={projectStage:stageOptions,constructionType:constructionOptions[category]};
+ const currentProvince = provinceLabel(provinceCode);
+ const wardOptions = Object.hasOwn(wardsByProvince, currentProvince) ? wardsByProvince[currentProvince] : [];
  const privacyIssues=projectPrivacyIssues({...fields,publicData:{constructionType:fields.constructionType,technicalSummary:fields.technicalSummary,scopeSummary:fields.scopeSummary}},{...privateData,participants});
  const issues=[...privacyIssues,...templateIssues([fields.title,fields.publicSummary,fields.constructionType,fields.technicalSummary,fields.scopeSummary]),...(fields.title.trim().length<5?['Tên dự án cần tối thiểu 5 ký tự.']:[]),...(fields.publicSummary.trim().length<20?['Mô tả công khai cần tối thiểu 20 ký tự.']:[]),...(!fields.provinceCode?['Bổ sung tỉnh/thành.']:[]),...(!fields.projectStage?['Bổ sung giai đoạn.']:[]),...(!participants.length&&!Object.entries(privateData).some(([key,value])=>key!=='projectReference'&&key!=='packageScope'&&value.trim())?['Bổ sung thông tin bảo vệ có giá trị.']:[]),...(!rights||!fields.rightsDeclaration.trim()?['Xác nhận và khai báo quyền cung cấp thông tin.']:[]),...(!/^[1-9][0-9]{0,18}$/.test(fields.pricePoints)||BigInt(fields.pricePoints||'0')>9223372036854775807n?['Giá POINT phải là số nguyên dương hợp lệ.']:[])];
  async function save(event:React.FormEvent<HTMLFormElement>){
@@ -55,7 +61,24 @@ export default function ProjectEditor({id,mode='edit',versionId,initialStep=1}:{
   setPending(true);setError('');setNotice('');
   try{const response=await fetch(command.fileId?`/api/seller/projects/${id}/files/${command.fileId}`:`/api/seller/projects/${id}/${command.name}`,{method:command.fileId?'DELETE':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:detail.project.revision,versionId:detail.version.id})});const body=await response.json();if(!response.ok)throw new Error(body.error||'Không thể thực hiện thao tác.');await load();setNotice(body.errors?.length?body.errors.join(' '):'Đã cập nhật dự án và lưu lịch sử.');if(command.name==='revision')router.push(`/seller/projects/${id}/edit`);}catch(cause){setError(cause instanceof Error?cause.message:'Không thể kết nối.');}finally{setPending(false);setCommand(null);}
  }
- function field(key:keyof typeof empty,label:string,rows?:number){return <label key={key}>{label}{rows?<textarea value={fields[key]} rows={rows} maxLength={key==='publicSummary'?5000:key==='technicalSummary'?3000:key==='scopeSummary'?240:1000} onChange={event=>{setFields({...fields,[key]:event.target.value});setDirty(true);}}/>:<input list={choices[key]?`project-options-${key}`:undefined} value={fields[key]} required={key==='title'} inputMode={key==='pricePoints'?'numeric':key.startsWith('size')?'decimal':undefined} maxLength={key==='title'?300:key==='pricePoints'?19:key==='provinceCode'?20:key==='districtName'?120:key==='projectStage'?80:120} onChange={event=>{setFields({...fields,[key]:event.target.value});setDirty(true);}}/>}{choices[key]&&<datalist id={`project-options-${key}`}>{choices[key]?.map(value=><option key={value} value={value}/>)}</datalist>}</label>;}
+ function field(key:keyof typeof empty,label:string,rows?:number){
+  if (key === 'provinceCode') return <label key={key}>{label}
+   <select value={provinceCode} onChange={event=>updateFields({provinceCode:event.target.value,districtName:''})}>
+    <option value="">Chọn tỉnh / thành</option>
+    {provinceCode && !provinceOptions.includes(provinceCode) && <option value={provinceCode}>{provinceLabel(provinceCode)} (đã lưu)</option>}
+    {provinceOptions.map(name=><option key={name} value={name}>{name}</option>)}
+   </select>
+  </label>;
+  if (key === 'districtName') return <label key={key}>{label}
+   <select value={fields.districtName} disabled={!wardOptions.length && !fields.districtName}
+    onChange={event=>updateFields({districtName:event.target.value})}>
+    <option value="">{wardOptions.length ? 'Chọn phường / xã / đặc khu (nếu biết)' : 'Chọn tỉnh / thành hiện hành trước'}</option>
+    {fields.districtName && !wardOptions.includes(fields.districtName) && <option value={fields.districtName}>{fields.districtName} (đã lưu)</option>}
+    {wardOptions.map(name=><option key={name} value={name}>{name}</option>)}
+   </select>
+  </label>;
+  return <label key={key}>{label}{rows?<textarea value={fields[key]} rows={rows} maxLength={key==='publicSummary'?5000:key==='technicalSummary'?3000:key==='scopeSummary'?240:1000} onChange={event=>{setFields({...fields,[key]:event.target.value});setDirty(true);}}/>:<input list={choices[key]?`project-options-${key}`:undefined} value={fields[key]} required={key==='title'} inputMode={key==='pricePoints'?'numeric':key.startsWith('size')?'decimal':undefined} maxLength={key==='title'?300:key==='pricePoints'?19:key==='projectStage'?80:120} onChange={event=>{setFields({...fields,[key]:event.target.value});setDirty(true);}}/>}{choices[key]&&<datalist id={`project-options-${key}`}>{choices[key]?.map(value=><option key={value} value={value}/>)}</datalist>}</label>;
+ }
  if(loading)return <div className="p2-skeleton" role="status">Đang tải phiên bản dự án…</div>;
  if(id&&!detail)return <div className="p2-empty" role="alert"><p>{error||'Không tìm thấy dự án.'}</p><button className="button button-secondary" onClick={()=>{setLoading(true);load().catch(cause=>setError(cause.message)).finally(()=>setLoading(false));}}>Thử lại</button></div>;
  return <div className="project-workspace p2-editor">
