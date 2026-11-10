@@ -13,7 +13,10 @@ export default function ProjectParticipantCards({ participants }: { participants
           <div><dt>Tình trạng theo nguồn</dt><dd>{participantStatuses[row.status]}</dd></div>
           {row.source && <div><dt>Nguồn đối chiếu</dt><dd>{row.source}</dd></div>}
           {row.checkedOn && <div><dt>Ngày đối chiếu</dt><dd><time dateTime={row.checkedOn}>{row.checkedOn.split('-').reverse().join('/')}</time></dd></div>}
-          {row.contact && <div><dt>Đầu mối công việc</dt><dd>{row.contact}</dd></div>}
+          {row.contact && <div><dt>Người liên hệ</dt><dd>{row.contact}</dd></div>}
+          {row.address && <div><dt>Địa chỉ đơn vị</dt><dd>{row.address}</dd></div>}
+          {row.phone && <div><dt>Điện thoại liên hệ</dt><dd>{row.phone}</dd></div>}
+          {row.email && <div><dt>Email liên hệ</dt><dd>{row.email}</dd></div>}
         </dl>
       </article>)}
     </div>

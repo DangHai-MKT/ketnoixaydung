@@ -1,7 +1,7 @@
 import { AccessError } from '../auth/permissions';
 
 export const participantRoles = {
-  investor: 'Chủ đầu tư', general_contractor: 'Tổng thầu thi công', main_contractor: 'Nhà thầu chính',
+  investor: 'Chủ đầu tư', project_manager: 'Ban quản lý dự án', general_contractor: 'Tổng thầu thi công', main_contractor: 'Nhà thầu chính',
   construction_contractor: 'Nhà thầu thi công', subcontractor: 'Nhà thầu phụ', consultant: 'Đơn vị tư vấn',
   supervisor: 'Tư vấn giám sát', supplier: 'Nhà cung cấp', unknown: 'Chưa xác định vai trò',
 } as const;
@@ -9,11 +9,11 @@ export const participantStatuses = {
   unverified: 'Chưa xác minh', tendering: 'Đang mời thầu', announced: 'Đã công bố kết quả lựa chọn',
 } as const;
 export const maxProjectParticipants = 8;
-export const participantLimits = { name: 150, scope: 180, stage: 80, source: 240, checkedOn: 10, contact: 160 };
+export const participantLimits = { name: 150, scope: 180, stage: 80, source: 240, checkedOn: 10, contact: 160, phone: 40, email: 320, address: 500 };
 export type ProjectParticipant = {
   role: keyof typeof participantRoles; status: keyof typeof participantStatuses;
-} & Record<keyof typeof participantLimits, string>;
-export const protectedParticipantKeys = ['name', 'contact'] as const;
+} & Record<Exclude<keyof typeof participantLimits, 'phone' | 'email' | 'address'>, string> & {phone?: string; email?: string; address?: string};
+export const protectedParticipantKeys = ['name', 'contact', 'phone', 'email', 'address'] as const;
 
 export function projectParticipants(value: unknown): ProjectParticipant[] {
   if (value === undefined) return [];
@@ -31,6 +31,8 @@ export function projectParticipants(value: unknown): ProjectParticipant[] {
       return [key, field.trim()];
     })) as Record<keyof typeof participantLimits, string>;
     if (!fields.name) throw new AccessError(400, 'Nhập tên cho từng đơn vị tham gia.');
+    if (fields.phone && !/^\+?[0-9 ()-]{8,40}$/.test(fields.phone)) throw new AccessError(400, 'Điện thoại của đơn vị tham gia không hợp lệ.');
+    if (fields.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email)) throw new AccessError(400, 'Email của đơn vị tham gia không hợp lệ.');
     if (fields.checkedOn) {
       const date = new Date(fields.checkedOn);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(fields.checkedOn) || Number.isNaN(date.getTime())
@@ -39,7 +41,8 @@ export function projectParticipants(value: unknown): ProjectParticipant[] {
     if (row.status === 'announced' && (!fields.source || !fields.checkedOn)) {
       throw new AccessError(400, 'Kết quả lựa chọn đã công bố cần có nguồn và ngày đối chiếu.');
     }
-    return { ...fields, role: row.role as ProjectParticipant['role'], status: row.status as ProjectParticipant['status'] };
+    const {phone,email,address,...existing} = fields;
+    return { ...existing, ...(phone ? {phone} : {}), ...(email ? {email} : {}), ...(address ? {address} : {}), role: row.role as ProjectParticipant['role'], status: row.status as ProjectParticipant['status'] };
   });
 }
 

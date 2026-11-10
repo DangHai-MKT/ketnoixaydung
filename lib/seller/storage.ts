@@ -19,15 +19,17 @@ export function uploadLimits() {
     maxRetainedDocuments: limit('SELLER_DOCUMENT_MAX_RETAINED_COUNT', 30, 100),
     maxStoredBytes: limit('SELLER_DOCUMENT_MAX_STORED_BYTES', 50 * 1024 * 1024, 200 * 1024 * 1024) };
 }
-export async function normalizeImage(bytes: Buffer, declaredMime: string): Promise<Buffer> {
+export async function normalizeImage(bytes: Buffer, declaredMime: string, allowWebp = false): Promise<Buffer> {
   if (!bytes.length || bytes.length > uploadLimits().maxBytes) throw new AccessError(413, 'Tài liệu vượt quá giới hạn dung lượng.');
   const png = bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
   const jpeg = bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
-  if ((!png && !jpeg) || declaredMime !== (png ? 'image/png' : 'image/jpeg')) throw new AccessError(415, 'Chỉ chấp nhận ảnh PNG hoặc JPEG có nội dung hợp lệ.');
+  const webp = allowWebp && bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP';
+  const format = png ? 'png' : jpeg ? 'jpeg' : webp ? 'webp' : '';
+  if (!format || declaredMime !== 'image/' + format) throw new AccessError(415, allowWebp ? 'Chỉ chấp nhận ảnh PNG, JPEG hoặc WebP hợp lệ.' : 'Chỉ chấp nhận ảnh PNG hoặc JPEG có nội dung hợp lệ.');
   try {
     const image = sharp(bytes, { failOn: 'warning', limitInputPixels: 20_000_000, animated: false });
     const metadata = await image.metadata();
-    if (!['png', 'jpeg'].includes(metadata.format ?? '') || (metadata.pages ?? 1) !== 1 || !metadata.width || !metadata.height) throw new Error();
+    if (metadata.format !== format || (metadata.pages ?? 1) !== 1 || !metadata.width || !metadata.height) throw new Error();
     // Decode the full image and re-encode; strip metadata and appended/polyglot payloads.
     const normalized = await image.rotate().png({ compressionLevel: 9 }).toBuffer();
     if (normalized.length > uploadLimits().maxBytes) throw new AccessError(413, 'Ảnh sau chuẩn hóa vượt giới hạn dung lượng.');
@@ -67,15 +69,15 @@ async function storageRoot(namespace: 'seller' | 'project' | 'dispute' | 'payout
 export function validStorageKey(key: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.png$/.test(key);
 }
-export async function storeImage(bytes: Buffer, namespace: 'seller' | 'project' | 'dispute' | 'payout' = 'seller'): Promise<string> {
+export async function storeImage(bytes: Buffer, namespace: 'seller' | 'project' | 'dispute' | 'payout' = 'seller', projectDocument = false): Promise<string> {
   const root = await storageRoot(namespace);
-  const key = `${randomUUID()}.png`;
+  const key = `${randomUUID()}.${namespace === 'project' && projectDocument ? 'blob' : 'png'}`;
   const file = await open(/* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ root, key), 'wx', 0o600);
   try { await file.writeFile(bytes); await file.sync(); } finally { await file.close(); }
   return key;
 }
 export async function readImage(key: string, namespace: 'seller' | 'project' | 'dispute' | 'payout' = 'seller'): Promise<Buffer> {
-  if (!validStorageKey(key)) throw new AccessError(404, 'Không tìm thấy tài liệu.');
+  if (!validStorageKey(key) && !(namespace === 'project' && key.endsWith('.blob') && validStorageKey(key.slice(0, -5) + '.png'))) throw new AccessError(404, 'Không tìm thấy tài liệu.');
   const target = path.join(/* turbopackIgnore: true */ await storageRoot(namespace), key);
   try {
     const info = await lstat(/* turbopackIgnore: true */ target);

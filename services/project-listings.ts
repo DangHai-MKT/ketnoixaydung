@@ -1,13 +1,13 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
-import { and, asc, desc, eq, isNull, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import { db } from '../db/client';
-import { auditLogs, moderationReviews, projectFiles, projectPrivateData, projectVersions, projects, sellerProfiles, users } from '../db/schema';
+import { auditLogs, moderationReviews, notifications, projectFiles, projectPrivateData, projectVersions, projects, sellerProfiles, userRoles, users } from '../db/schema';
 import { AccessError, requireActive, requireRoles, type Actor } from '../lib/auth/permissions';
 import { publicProject } from '../lib/projects/contracts';
 import { assertDraft, assertProjectRevision, projectLabels, projectReviewerRoles } from '../lib/projects/workflow';
 import { autoCheck, projectInput, revisionInput, uuidInput, type ProjectInput } from '../lib/projects/validation';
-import { verifiedProjectImage, storeProjectImage, uploadLimits } from '../lib/projects/storage';
+import { verifiedProjectFile, storeProjectFile, uploadLimits } from '../lib/projects/storage';
 import { lockActors } from './seller-context';
 import { activeProjectFiles, checkFileBudget, lockProject, projectEvent, workingVersion, versionContent } from './project-context';
 import { findProjectOverlap } from './project-overlap';
@@ -138,7 +138,7 @@ export async function submitProject(actor: Actor, id: string, expected: number, 
     const parsed = projectInput({ ...versionContent(version), pricePoints: version.pricePoints.toString(),
       privateData: privateRow?.privateData ?? {}, rightsConfirmed: !!privateRow?.dataRightsConfirmedAt, rightsDeclaration: privateRow?.dataRightsDeclaration ?? '' });
     const errors = autoCheck(parsed, files);
-    for(const file of files)await verifiedProjectImage(file);
+    for(const file of files)await verifiedProjectFile(file);
     const state = errors.length ? 'needs_correction' : 'pending_review';
     const overlap = errors.length ? null : await findProjectOverlap(tx, version, project.sellerId, privateRow?.privateData ?? {});
     const overlapWarning = overlap?.matches.some(match => match.finding !== 'related_package') ?? false;
@@ -147,6 +147,18 @@ export async function submitProject(actor: Actor, id: string, expected: number, 
     const [updated] = await tx.update(projects).set({ revision: project.revision + 1, updatedAt: new Date(),
       status: ['published', 'paused'].includes(project.status) ? project.status : state }).where(eq(projects.id, id)).returning();
     await projectEvent(tx, actor.id, updated, 'project.submitted', version.id, { autoCheckPassed: errors.length === 0, overlapWarning }, true);
+    if (state === 'pending_review') {
+      const recipients = await tx.selectDistinct({ id: users.id }).from(users)
+        .innerJoin(userRoles, eq(users.id, userRoles.userId))
+        .where(and(eq(users.status, 'active'), inArray(userRoles.role, projectReviewerRoles), ne(users.id, project.sellerId)));
+      if (recipients.length) await tx.insert(notifications).values(recipients.map(({ id: recipientId }) => ({
+        userId: recipientId,
+        type: 'project.review_requested',
+        title: 'Có tin dự án chờ kiểm duyệt',
+        body: 'Mở phiên bản được gửi để kiểm tra và xét duyệt.',
+        data: { projectId: id, versionId: version.id, href: `/admin/projects/${id}?version=${version.id}` },
+      })));
+    }
     return { id, revision: updated.revision, state, errors };
   });
 }
@@ -172,8 +184,8 @@ export async function proposeRevision(actor: Actor, id: string, expected: number
     if (files.length > uploadLimits().maxDocuments) throw new AccessError(409, 'Phiên bản nguồn có quá nhiều tệp để sao chép.');
     await checkFileBudget(tx, id, files.length, files.reduce((sum, file) => sum + file.sizeBytes, 0n));
     for (const file of files) {
-      const bytes = await verifiedProjectImage(file);
-      const key = await storeProjectImage(bytes);
+      const bytes = await verifiedProjectFile(file);
+      const key = await storeProjectFile(bytes, file.mimeType);
       await tx.insert(projectFiles).values({ projectVersionId: version.id, storageKey: key, originalFilename: file.originalFilename, mimeType: file.mimeType,
         sizeBytes: file.sizeBytes, accessLevel: file.accessLevel, checksumSha256: file.checksumSha256 });
     }

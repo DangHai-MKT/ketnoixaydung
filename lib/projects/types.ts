@@ -10,7 +10,7 @@ export type ProjectDetail = {
   privateData: Record<string, string>; rightsConfirmed: boolean; rightsDeclaration: string;
   participants: ProjectParticipant[];
   versions: { id: string; versionNo: number; status: string; approvedAt: string | null }[];
-  files: { id: string; originalFilename: string; accessLevel: string; url: string; sizeBytes: string }[];
+  files: { id: string; originalFilename: string; accessLevel: string; url: string; sizeBytes: string; mimeType: string }[];
   reviews: { id: string; projectVersionId: string; decision: string; reason: string | null; createdAt: string; automatedChecks: { errors?: string[]; passed?: boolean } }[];
   preview: PublicProject; currentPreview: PublicProject | null; currentVersionId: string | null;
   overlapWarning: boolean;

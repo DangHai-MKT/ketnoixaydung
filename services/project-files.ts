@@ -5,7 +5,8 @@ import { db } from '../db/client';
 import { projectFiles, projectVersions, projects, sellerProfiles } from '../db/schema';
 import { AccessError, requireActive, requireRoles, type Actor } from '../lib/auth/permissions';
 import { assertDraft, assertProjectRevision, projectReviewerRoles } from '../lib/projects/workflow';
-import { normalizeImage, verifiedProjectImage, storeProjectImage, uploadLimits } from '../lib/projects/storage';
+import { normalizeProjectFile, verifiedProjectFile, storeProjectFile, uploadLimits } from '../lib/projects/storage';
+import { projectFileExtensions, validProjectFileType } from '../lib/projects/file-types';
 import { activeProjectFiles, checkFileBudget, lockProject, projectEvent, workingVersion } from './project-context';
 import { getPublicProject } from './public-projects';
 import { hasPurchasedVersion } from './purchase-access';
@@ -20,7 +21,8 @@ export async function uploadProjectFile(actor: Actor, id: string, versionId: str
     if (version.id !== versionId) throw new AccessError(409, 'Phiên bản không khớp.');
     assertDraft(version);
   });
-  const bytes = await normalizeImage(Buffer.from(await file.arrayBuffer()), file.type);
+  const { bytes, mimeType } = await normalizeProjectFile(file);
+  if (!validProjectFileType(mimeType, accessLevel)) throw new AccessError(400, 'PDF, DOC và DOCX chỉ được tải ở chế độ bảo vệ hoặc dành cho kiểm duyệt.');
   return db.transaction(async (tx) => {
     const { project } = await lockProject(tx, actor, id);
     if (project.status === 'archived') throw new AccessError(409, 'Dự án đã lưu trữ.');
@@ -32,10 +34,10 @@ export async function uploadProjectFile(actor: Actor, id: string, versionId: str
     if (replaceId && !files.some((row) => row.id === replaceId)) throw new AccessError(404, 'Tệp thay thế không thuộc phiên bản của bạn.');
     if (!replaceId && files.length >= uploadLimits().maxDocuments) throw new AccessError(400, 'Phiên bản đã đạt giới hạn số tệp.');
     await checkFileBudget(tx, id, 1, BigInt(bytes.length));
-    const storageKey = await storeProjectImage(bytes);
+    const storageKey = await storeProjectFile(bytes, mimeType);
     if (replaceId) await tx.update(projectFiles).set({ supersededAt: new Date() }).where(eq(projectFiles.id, replaceId));
-    const [created] = await tx.insert(projectFiles).values({ projectVersionId: version.id, storageKey, originalFilename: file.name.replace(/\\/g, '/').split('/').pop()!.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 255) || 'anh-du-an.png',
-      mimeType: 'image/png', sizeBytes: BigInt(bytes.length), accessLevel, checksumSha256: createHash('sha256').update(bytes).digest('hex') }).returning({ id: projectFiles.id });
+    const [created] = await tx.insert(projectFiles).values({ projectVersionId: version.id, storageKey, originalFilename: file.name.replace(/\\/g, '/').split('/').pop()!.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 255) || 'tep-du-an.'+projectFileExtensions[mimeType],
+      mimeType, sizeBytes: BigInt(bytes.length), accessLevel, checksumSha256: createHash('sha256').update(bytes).digest('hex') }).returning({ id: projectFiles.id });
     const [updated] = await tx.update(projects).set({ revision: project.revision + 1, updatedAt: new Date() }).where(eq(projects.id, id)).returning();
     await projectEvent(tx, actor.id, updated, 'project.file_uploaded', version.id);
     return { id: created.id, revision: updated.revision };
@@ -62,9 +64,9 @@ export async function downloadProjectFile(actor: Actor | null, projectId: string
       if (!row.submittedAt && !row.approvedAt) throw new AccessError(403, 'Tệp của bản nháp chưa được gửi xét duyệt.');
     }
   }
-  const bytes = await verifiedProjectImage(row.file);
-  return new Response(new Uint8Array(bytes), { headers: { 'Content-Type': 'image/png', 'Content-Length': String(bytes.length),
-    'Content-Disposition': `${isPublic ? 'inline' : 'attachment'}; filename="du-an-${fileId}.png"`, 'Cache-Control': 'private, no-store',
+  const bytes = await verifiedProjectFile(row.file);
+  return new Response(new Uint8Array(bytes), { headers: { 'Content-Type': row.file.mimeType, 'Content-Length': String(bytes.length),
+    'Content-Disposition': `${isPublic ? 'inline' : 'attachment'}; filename="du-an-${fileId}.${projectFileExtensions[row.file.mimeType]}"`, 'Cache-Control': 'private, no-store',
     'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; sandbox" } });
 }
 

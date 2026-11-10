@@ -6,7 +6,7 @@ import {db} from '../db/client';
 import {auditLogs,ledgerEntries,ledgerTransactions,notifications,paymentEvents,paymentOrders,systemSettings,userRoles,users,wallets} from '../db/schema';
 import {AccessError,isRole,requireRoles,type Actor,type Role} from '../lib/auth/permissions';
 import {uuidInput} from '../lib/seller/validation';
-import {approvedTopupPolicy,topupPoints} from '../lib/finance/money';
+import {approvedTopupPolicy,approvedTopupRate,topupPoints,topupPolicyForRate,type TopupPolicy} from '../lib/finance/money';
 import {bankConfigurationInput,bankInstructions,confirmationInput,topupInput,type BankInstructions,paymentQuery} from '../lib/finance/topup';
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 const provider='manual_bank_transfer',financeRoles=['finance_operator','super_admin'] as const;
@@ -24,18 +24,66 @@ async function configuration(tx:Tx){
  const one=(key:string)=>{const list=rows.filter(r=>r.settingKey===key);if(list.length!==1)throw new AccessError(503,'Nạp điểm chưa sẵn sàng: cấu hình cần được xác minh hoặc có khoảng hiệu lực chồng lấn.');return list[0];};
  const rate=one('topup_rate'),policy=one('manual_topup_policy'),bank=one('manual_bank_transfer');
  let instructions:BankInstructions;try{instructions=bankInstructions(bank.value,isTopupTestEnvironment());topupPoints(approvedTopupPolicy.minVnd,rate.value as {amountVnd:unknown;points:unknown},policy.value);}catch(error){if(error instanceof AccessError)throw new AccessError(503,error.message);throw error;}
- return {rate:{amountVnd:String(rate.value.amountVnd),points:String(rate.value.points),version:rate.version},policy:{...approvedTopupPolicy,version:policy.version},bank:{...instructions,version:bank.version},testEnvironment:isTopupTestEnvironment()};
+ return {rate:{amountVnd:String(rate.value.amountVnd),points:String(rate.value.points),version:rate.version},policy:{...topupPolicyForRate({amountVnd:rate.value.amountVnd,points:rate.value.points}),version:policy.version},bank:{...instructions,version:bank.version},testEnvironment:isTopupTestEnvironment()};
 }
 export async function getTopupConfiguration(actor:Actor){await readActor(actor,['buyer']);return db.transaction(configuration,{isolationLevel:'repeatable read',accessMode:'read only'});}
-export async function getBankConfiguration(actor:Actor){await readActor(actor,['super_admin']);const [row]=await db.select({value:systemSettings.value,version:systemSettings.version}).from(systemSettings).where(eq(systemSettings.settingKey,'manual_bank_transfer')).orderBy(desc(systemSettings.version)).limit(1);return {bank:row?.value??null,version:row?.version??0,policy:approvedTopupPolicy,testEnvironment:isTopupTestEnvironment()};}
+function activeTopupRates(tx:Pick<Tx,'select'>, now = new Date()){
+ return tx.select().from(systemSettings).where(and(eq(systemSettings.settingKey,'topup_rate'),
+  lte(systemSettings.effectiveFrom,now),or(isNull(systemSettings.effectiveTo),gt(systemSettings.effectiveTo,now))));
+}
+export async function getTopupRate(){
+ const rates=await activeTopupRates(db);
+ if(rates.length!==1)throw new AccessError(503,'Không xác định được tỷ giá nạp đang hiệu lực.');
+ const {value,version}=rates[0];
+ const rate={amountVnd:String(value.amountVnd),points:String(value.points),version};
+ return {rate,policy:topupPolicyForRate(rate)};
+}
+export async function getBankConfiguration(actor:Actor){await readActor(actor,['super_admin']);const [[row],pricing]=await Promise.all([
+ db.select({value:systemSettings.value,version:systemSettings.version}).from(systemSettings).where(eq(systemSettings.settingKey,'manual_bank_transfer')).orderBy(desc(systemSettings.version)).limit(1),
+ getTopupRate().catch(error=>{if(error instanceof AccessError)return null;throw error;}),
+ ]);return {bank:row?.value??null,version:row?.version??0,policy:pricing?.policy??approvedTopupPolicy,pricing,testEnvironment:isTopupTestEnvironment()};}
+export async function activateTopupRate(actor:Actor,input:unknown){
+ const data=input as Record<string,unknown>|null;
+ const reason=typeof data?.reason==='string'?data.reason.trim():'';
+ if(!data||Object.keys(data).some(key=>key!=='reason')||reason.length<10||reason.length>2000)
+  throw new AccessError(400,'Nhập lý do đổi tỷ giá từ 10 đến 2.000 ký tự.');
+ return db.transaction(async tx=>{
+  await actorNow(tx,actor,['super_admin']);
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(72301942)`);
+  const keys=['topup_rate','manual_topup_policy'],now=new Date();
+  const rows=await tx.select().from(systemSettings).where(inArray(systemSettings.settingKey,keys)).orderBy(desc(systemSettings.version));
+  if(rows.some(row=>row.effectiveFrom>now))throw new AccessError(409,'Có cấu hình đã lên lịch. Cần kiểm tra trước khi đổi tỷ giá.');
+  const active=rows.filter(row=>!row.effectiveTo||row.effectiveTo>now);
+  const rates=active.filter(row=>row.settingKey==='topup_rate'),policies=active.filter(row=>row.settingKey==='manual_topup_policy');
+  if(rates.length!==1||policies.length>1)throw new AccessError(409,'Cấu hình nạp hiện tại bị thiếu hoặc chồng lấn.');
+  const rate={amountVnd:rates[0].value.amountVnd,points:rates[0].value.points};
+  if(topupPolicyForRate(rate).stepVnd===approvedTopupPolicy.stepVnd&&policies[0]){
+   topupPoints(approvedTopupPolicy.minVnd,rate,policies[0].value);
+   return {ok:true,reused:true};
+  }
+  const from=new Date(Math.max(now.getTime(),...active.map(row=>row.effectiveFrom.getTime()+1)));
+  for(const key of keys){
+   await tx.update(systemSettings).set({effectiveTo:from}).where(and(eq(systemSettings.settingKey,key),
+    or(isNull(systemSettings.effectiveTo),gt(systemSettings.effectiveTo,from))));
+   await tx.insert(systemSettings).values({settingKey:key,version:(rows.find(row=>row.settingKey===key)?.version??0)+1,
+    value:key==='topup_rate'?{...approvedTopupRate}:{...approvedTopupPolicy},effectiveFrom:from,createdBy:actor.id,changeReason:reason});
+  }
+  await tx.insert(auditLogs).values({actorId:actor.id,action:'finance.topup_rate.updated',entityType:'system_settings',reason,
+   metadata:{priorRateVersion:rates[0].version,rate:approvedTopupRate,stepVnd:approvedTopupPolicy.stepVnd}});
+  return {ok:true,reused:false};
+ });
+}
 export async function saveBankConfiguration(actor:Actor,input:unknown){requireRoles(actor,['super_admin']);const data=bankConfigurationInput(input);
  return db.transaction(async tx=>{await actorNow(tx,actor,['super_admin']);await tx.execute(sql`SELECT pg_advisory_xact_lock(72301942)`);
  const prior=await tx.select().from(systemSettings).where(inArray(systemSettings.settingKey,['manual_bank_transfer','manual_topup_policy'])).orderBy(desc(systemSettings.version));
+ const rates=await activeTopupRates(tx);
+ if(rates.length!==1)throw new AccessError(503,'Không xác định được tỷ giá nạp đang hiệu lực.');
+ const ratePolicy=topupPolicyForRate({amountVnd:rates[0].value.amountVnd,points:rates[0].value.points});
  if(data.expectedVersion!==undefined&&data.expectedVersion!==(prior.find(r=>r.settingKey==='manual_bank_transfer')?.version??0))throw new AccessError(409,'Cấu hình đã thay đổi. Tải lại trang trước khi lưu.');
  const from=new Date(Math.max(Date.now(),...prior.map(r=>r.effectiveFrom.getTime()+1))),versions:Record<string,number>={};
  for(const key of ['manual_bank_transfer','manual_topup_policy']){const version=(prior.find(r=>r.settingKey===key)?.version??0)+1;versions[key]=version;
  await tx.update(systemSettings).set({effectiveTo:from}).where(and(eq(systemSettings.settingKey,key),or(isNull(systemSettings.effectiveTo),gt(systemSettings.effectiveTo,from))));
- await tx.insert(systemSettings).values({settingKey:key,version,value:key==='manual_bank_transfer'?{...data.bank,verifiedAt:data.bank.enabled?from.toISOString():null}:{...approvedTopupPolicy},effectiveFrom:from,createdBy:actor.id,changeReason:data.reason});}
+ await tx.insert(systemSettings).values({settingKey:key,version,value:key==='manual_bank_transfer'?{...data.bank,verifiedAt:data.bank.enabled?from.toISOString():null}:{...ratePolicy},effectiveFrom:from,createdBy:actor.id,changeReason:data.reason});}
  await tx.insert(auditLogs).values({actorId:actor.id,action:'finance.topup_configuration.updated',entityType:'system_settings',reason:data.reason,metadata:{enabled:data.bank.enabled,versions}});
  return {ok:true,versions};});
 }
@@ -43,7 +91,10 @@ export async function createTopup(actor:Actor,input:unknown){requireRoles(actor,
  return creationRetry(()=>db.transaction(async tx=>{await tx.execute(sql`SET LOCAL lock_timeout='5s'`);await tx.execute(sql`SET LOCAL statement_timeout='15s'`);await actorNow(tx,actor,['buyer']);
  const [prior]=await tx.select().from(paymentOrders).where(and(eq(paymentOrders.userId,actor.id),eq(paymentOrders.clientIdempotencyKey,data.idempotencyKey))).for('update');
  if(prior){if(prior.provider!==provider||prior.amountVnd.toString()!==data.amountVnd)throw new AccessError(409,'Mã yêu cầu đã được dùng cho số tiền hoặc phương thức khác.');return {id:prior.id,reused:true};}
- const config=await configuration(tx),conversion=topupPoints(data.amountVnd,config.rate,config.policy),now=new Date(),expiresAt=new Date(now.getTime()+config.policy.expiresHours*3600000);
+ await tx.execute(sql`SELECT pg_advisory_xact_lock_shared(72301942)`);
+ const config=await configuration(tx);
+ if(data.expectedRateVersion!==undefined&&data.expectedRateVersion!==config.rate.version)throw new AccessError(409,'Tỷ giá đã thay đổi. Tải lại trang để xem số điểm mới.');
+ const conversion=topupPoints(data.amountVnd,config.rate,config.policy),now=new Date(),expiresAt=new Date(now.getTime()+config.policy.expiresHours*3600000);
  const transferReference='CM'+BigInt('0x'+randomBytes(14).toString('hex')).toString(36).toUpperCase().padStart(22,'0');
  const [order]=await tx.insert(paymentOrders).values({userId:actor.id,provider,clientIdempotencyKey:data.idempotencyKey,amountVnd:BigInt(conversion.amountVnd),pointsToCredit:BigInt(conversion.points),exchangeRateVersion:config.rate.version,status:'pending',createdAt:now,updatedAt:now,expiresAt}).returning({id:paymentOrders.id});
  await tx.insert(paymentEvents).values({paymentOrderId:order.id,provider,providerEventId:`order-created:${order.id}`,eventType:'order.created',signatureValid:false,processingStatus:'processed',processedAt:now,payload:{schemaVersion:1,transferReference,amountVnd:conversion.amountVnd,points:conversion.points,rate:config.rate,policy:config.policy,bank:config.bank,expiresAt:expiresAt.toISOString()}});
@@ -52,7 +103,7 @@ export async function createTopup(actor:Actor,input:unknown){requireRoles(actor,
  return {id:order.id,reused:false};}));
 }
 async function creationRetry<T>(work:()=>Promise<T>):Promise<T>{for(let n=0;;n++)try{return await work();}catch(error){const code=errorCode(error);if(['55P03','57014'].includes(code))throw new AccessError(503,'Đơn đang được xử lý. Hãy kiểm tra lịch sử đơn nạp trước khi thử lại.');if(!['40P01','40001'].includes(code))throw error;if(n>=2)throw new AccessError(503,'Hệ thống đang bận. Vui lòng thử lại với cùng mã yêu cầu.');await delay(30*(n+1));}}
-type Snapshot={schemaVersion:number;transferReference?:string;amountVnd:string;points:string;rate:{amountVnd:string;points:string;version:number};policy:typeof approvedTopupPolicy&{version:number};bank:BankInstructions&{version:number};expiresAt:string};
+type Snapshot={schemaVersion:number;transferReference?:string;amountVnd:string;points:string;rate:{amountVnd:string;points:string;version:number};policy:TopupPolicy;bank:BankInstructions&{version:number};expiresAt:string};
 function validateSnapshot(payload:Record<string,unknown>,order:Pick<typeof paymentOrders.$inferSelect,'amountVnd'|'pointsToCredit'|'exchangeRateVersion'|'expiresAt'|'createdAt'>){
  const snapshot=payload as unknown as Snapshot;
  try{if(snapshot.schemaVersion!==1||!snapshot.bank||!snapshot.policy||!snapshot.rate||!Number.isSafeInteger(snapshot.bank.version)||snapshot.bank.version<1||!Number.isSafeInteger(snapshot.policy.version)||snapshot.policy.version<1)throw new Error('snapshot');

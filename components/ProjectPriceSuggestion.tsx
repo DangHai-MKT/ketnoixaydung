@@ -3,6 +3,7 @@
 import {useEffect, useRef, useState} from 'react';
 import type {PriceContext, PriceSuggestion} from '../lib/projects/price-learning';
 import {formatPoints} from '../lib/projects/workflow';
+import {suggestedProjectPrice} from '../lib/projects/quick-create';
 
 export default function ProjectPriceSuggestion({context, disabled, onApply}: {
   context: PriceContext;
@@ -39,8 +40,9 @@ export default function ProjectPriceSuggestion({context, disabled, onApply}: {
   }
 
   return <div className="p2-quick-panel">
+    <p><strong>Giá gợi ý: {formatPoints(suggestedProjectPrice)} POINT</strong> cho tin mới. Bạn có thể chỉnh giá trước khi gửi duyệt.</p>
     <div className="p2-quick-heading">
-      <div><h3>Gợi ý giá theo giao dịch</h3><p>Dựa trên giá mua thông tin đã hoàn tất. Bạn quyết định giá cuối cùng.</p></div>
+      <div><h3>Tham khảo thêm từ giao dịch</h3><p>Dựa trên giá mua thông tin đã hoàn tất. Bạn quyết định giá cuối cùng.</p></div>
       <button type="button" className="button button-secondary" disabled={pending || disabled} onClick={analyze}>
         {pending ? 'Đang phân tích…' : 'Phân tích giá'}
       </button>

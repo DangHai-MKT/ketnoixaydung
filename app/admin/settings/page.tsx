@@ -3,20 +3,21 @@ import {getSystemSettings} from '../../../services/settings';
 import {getBankConfiguration} from '../../../services/payments';
 import {IdentityHeader} from '../../../components/PhaseOneUI';
 import {DashboardPanel} from '../../../components/DashboardPanels';
-import {BankConfigurationForm} from '../../../components/TopUpForm';
+import {BankConfigurationForm,TopupRateActivation} from '../../../components/TopUpForm';
 import SystemSettingsForm from '../../../components/SystemSettingsForm';
 import {WalletTime} from '../../../components/WalletTransactions';
 import {getSepaySettings} from '../../../services/sepay-settings';
 import {SepaySettingsForm} from '../../../components/SepayForms';
 import {getPayoutConfiguration} from '../../../services/payout-base';
 import {PayoutForm} from '../../../components/PayoutForms';
-const labels:Record<string,string>={site_analytics:'Google Analytics',site_support:'Tổng đài & Zalo',platform_fee:'Phí nền tảng',seller_hold_period:'Thời gian giữ thu nhập',resend_email:'Email Resend',manual_bank_transfer:'Ngân hàng & QR',manual_topup_policy:'Chính sách nạp POINT',sepay_test:'SePay Test',seller_payout_policy:'Rút thu nhập người bán'};
+const labels:Record<string,string>={site_analytics:'Google Analytics',site_support:'Tổng đài & Zalo',platform_fee:'Phí nền tảng',seller_hold_period:'Thời gian giữ thu nhập',resend_email:'Email Resend',manual_bank_transfer:'Ngân hàng & QR',manual_topup_policy:'Chính sách nạp POINT',topup_rate:'Tỷ giá nạp điểm',sepay_test:'SePay Test',seller_payout_policy:'Rút thu nhập người bán'};
 export default async function SettingsPage(){
  const actor=await requirePageActor('/admin/settings',['super_admin']);const [config,bank,sepay,payout]=await Promise.all([getSystemSettings(actor),getBankConfiguration(actor),getSepaySettings(actor),getPayoutConfiguration(actor)]);
  return <main className="fw-page settings-page"><IdentityHeader rootHref="/admin" rootLabel="Quản trị" title="Cấu hình hệ thống" description="Quản lý hỗ trợ khách hàng, thanh toán và email tại một nơi."/>
- <nav className="settings-sections" aria-label="Các nhóm cấu hình"><a href="#bank">01 · Ngân hàng & QR</a><a href="#finance">02 · Phí & thời gian giữ</a><a href="#email">03 · Email Resend</a><a href="#sepay">04 · SePay Test</a><a href="#payout">05 · Rút thu nhập</a><a href="#support">06 · Tổng đài & Zalo</a><a href="#analytics">07 · Google Analytics</a><a href="#history">Lịch sử thay đổi</a></nav>
+ <nav className="settings-sections" aria-label="Các nhóm cấu hình"><a href="#bank">01 · Ngân hàng & QR</a><a href="#topup-rate">Tỷ giá nạp điểm</a><a href="#finance">02 · Phí & thời gian giữ</a><a href="#email">03 · Email Resend</a><a href="#sepay">04 · SePay Test</a><a href="#payout">05 · Rút thu nhập</a><a href="#support">06 · Tổng đài & Zalo</a><a href="#analytics">07 · Google Analytics</a><a href="#history">Lịch sử thay đổi</a></nav>
  <p className="fw-info">Chỉ quản trị viên cấp cao được chỉnh sửa. Mỗi nhóm được lưu riêng, có phiên bản và lý do; không thay đổi dữ liệu đã chốt trên đơn cũ.</p>
- <section id="bank"><DashboardPanel title="Ngân hàng & mã QR thanh toán" icon="wallet"><p className="fw-note">Thiết lập tài khoản nhận chuyển khoản và mã ngân hàng BIN để tạo QR đúng thông tin trên từng đơn nạp. Phiên bản hiện tại: {bank.version}.</p><BankConfigurationForm key={'bank-'+bank.version} bank={bank.bank} version={bank.version} testEnvironment={bank.testEnvironment}/></DashboardPanel></section>
+ <section id="bank"><DashboardPanel title="Ngân hàng & mã QR thanh toán" icon="wallet"><p className="fw-note">Thiết lập tài khoản nhận chuyển khoản và mã ngân hàng BIN để tạo QR đúng thông tin trên từng đơn nạp. Phiên bản hiện tại: {bank.version}.</p><BankConfigurationForm key={'bank-'+bank.version} bank={bank.bank} version={bank.version} testEnvironment={bank.testEnvironment} stepVnd={bank.policy.stepVnd}/></DashboardPanel></section>
+ <section id="topup-rate"><DashboardPanel title="Tỷ giá nạp điểm" icon="wallet"><TopupRateActivation active={bank.pricing?.policy.stepVnd==='1000'}/></DashboardPanel></section>
  <section id="finance"><DashboardPanel title="Phí giao dịch & thời gian giữ thu nhập" icon="shield"><p className="fw-note">Phiên bản phí: {config.finance.feeVersion} · Phiên bản thời gian giữ: {config.finance.holdVersion}. Mặc định ban đầu: 10% và 7 ngày.</p><SystemSettingsForm key={'finance-'+config.finance.version} group="finance" {...config.finance}/></DashboardPanel></section>
  <section id="email"><DashboardPanel title="Email giao dịch · Resend" icon="file"><SystemSettingsForm key={'email-'+config.email.version} group="email" {...config.email}/></DashboardPanel></section>
  <section id="sepay"><DashboardPanel title="Nhà cung cấp thanh toán · SePay Test" icon="shield"><p>Webhook: <code>/api/webhooks/sepay-test</code> · xác thực HMAC-SHA256. API chỉ kết nối máy chủ Test của SePay.</p><SepaySettingsForm key={'sepay-'+sepay.version} config={sepay}/><a href="/admin/payments/sepay-test">Mở danh sách đối soát →</a></DashboardPanel></section>

@@ -1,27 +1,122 @@
 'use client';
-import { useState } from 'react';
+
+import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import type { ProjectDetail } from '../lib/projects/types';
-export const accessLabels: Record<string, string> = { public_preview: 'Công khai sau khi duyệt', purchased_only: 'Bảo vệ — chỉ người đã mua đúng phiên bản', moderator_only: 'Chỉ chủ sở hữu và kiểm duyệt' };
-export default function ProjectFileUpload({ detail, disabled, onSaved, onBusy }: { detail: ProjectDetail; disabled: boolean; onSaved: () => Promise<void>; onBusy: (busy: boolean) => void }) {
-  const [pending, setPending] = useState(false), [error, setError] = useState('');
-  async function upload(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault(); if (pending || disabled) return;
-    const form = event.currentTarget, body = new FormData(form);
-    body.set('revision', String(detail.project.revision)); body.set('versionId', detail.version.id);
-    if (!body.get('replaceId')) body.delete('replaceId');
-    setPending(true); onBusy(true); setError('');
+
+export const accessLabels: Record<string, string> = {
+  public_preview: 'Công khai sau khi duyệt',
+  purchased_only: 'Bảo vệ — chỉ người đã mua đúng phiên bản',
+  moderator_only: 'Chỉ chủ sở hữu và kiểm duyệt',
+};
+
+const images = '.jpeg,.jpg,.png,.webp';
+const allFiles = images + ',.pdf,.doc,.docx';
+
+export default function ProjectFileUpload({ detail, disabled, onSaved, onBusy }: {
+  detail: ProjectDetail;
+  disabled: boolean;
+  onSaved: () => Promise<void>;
+  onBusy: (busy: boolean) => void;
+}) {
+  const photoInput = useRef<HTMLInputElement>(null);
+  const protectedInput = useRef<HTMLInputElement>(null);
+  const busy = useRef(false);
+  const [pending, setPending] = useState('');
+  const [error, setError] = useState('');
+  const [needsReload, setNeedsReload] = useState(false);
+  const [advancedAccess, setAdvancedAccess] = useState('moderator_only');
+  const locked = disabled || Boolean(pending) || needsReload;
+
+  async function run(label: string, work: () => Promise<void>) {
+    if (busy.current || disabled) return;
+    busy.current = true;
+    setPending(label);
+    setError('');
+    onBusy(true);
     try {
-      const response = await fetch(`/api/seller/projects/${detail.project.id}/files`, { method: 'POST', body });
-      const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Không thể tải tệp.');
-      form.reset(); await onSaved();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Không thể kết nối.'); }
-    finally { setPending(false); onBusy(false); }
+      await work();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Không thể kết nối. Vui lòng thử lại.');
+    } finally {
+      busy.current = false;
+      setPending('');
+      onBusy(false);
+    }
   }
-  return <section className="project-editor-section"><h2>Ảnh và tài liệu dự án</h2><p>JPEG/PNG, mặc định tối đa 5 MB/tệp và 5 tệp mỗi phiên bản. Tệp công khai cũng phải chờ duyệt. Không tải tài liệu bạn chưa có quyền chia sẻ.</p>
-    {disabled && <p>Lưu thông tin đang sửa trước khi tải tệp.</p>}<form className="auth-form" onSubmit={upload}><fieldset disabled={disabled || pending}>
-      <label>Mức truy cập<select name="accessLevel" defaultValue="purchased_only">{Object.entries(accessLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><p>Chọn công khai chỉ với ảnh không chứa liên hệ, vị trí chính xác hoặc dữ liệu thương mại nhạy cảm. Tài liệu bảo vệ mặc định chỉ mở cho người đã mua đúng phiên bản.</p>
-      <label>Thay thế tệp (nếu cần)<select name="replaceId"><option value="">Thêm tệp mới</option>{detail.files.map((file) => <option key={file.id} value={file.id}>{file.originalFilename}</option>)}</select></label>
-      <label>Chọn ảnh<input name="file" type="file" accept="image/png,image/jpeg" required /></label><button className="button button-secondary">{pending ? 'Đang kiểm tra và tải tệp…' : 'Tải tệp riêng tư'}</button>
-    </fieldset>{error && <p role="alert" className="auth-error">{error}</p>}</form>
+
+  async function reload() {
+    try {
+      await onSaved();
+      setNeedsReload(false);
+    } catch {
+      setNeedsReload(true);
+      throw new Error('Tệp đã lưu. Hãy cập nhật danh sách trước khi tải thêm.');
+    }
+  }
+
+  async function upload(file: File, access: string, replaceId = '') {
+    if (locked) return;
+    await run('Đang tải ' + file.name + '…', async () => {
+      const body = new FormData();
+      body.set('file', file);
+      body.set('accessLevel', access);
+      body.set('revision', String(detail.project.revision));
+      body.set('versionId', detail.version.id);
+      if (replaceId) body.set('replaceId', replaceId);
+      const response = await fetch(`/api/seller/projects/${detail.project.id}/files`, { method: 'POST', body });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(result?.error || 'Không thể tải tệp. Vui lòng thử lại.');
+      await reload();
+    });
+  }
+
+  function selectFile(event: ChangeEvent<HTMLInputElement>, access: string) {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = '';
+    if (file) void upload(file, access);
+  }
+
+  function advancedSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const body = new FormData(form);
+    const file = body.get('file');
+    if (file instanceof File && file.name) {
+      form.reset();
+      void upload(file, advancedAccess, String(body.get('replaceId') ?? ''));
+    }
+  }
+
+  return <section className="project-editor-section" aria-busy={Boolean(pending)}>
+    <h2>2. Ảnh và tệp</h2>
+    <p>Chọn một tệp để tải lên ngay. Mặc định tối đa 5 MB/tệp và 5 tệp mỗi phiên bản.</p>
+    <div className="project-form-grid">
+      <div className="p2-quick-panel">
+        <h3>Ảnh công khai</h3>
+        <p>JPEG, JPG, PNG, WebP. Ảnh đầu tiên làm ảnh đại diện sau khi tin được duyệt.</p>
+        <input ref={photoInput} type="file" hidden accept={images} disabled={locked} onChange={event=>selectFile(event,'public_preview')}/>
+        <button type="button" className="button button-primary" disabled={locked} onClick={()=>photoInput.current?.click()}>Thêm ảnh công khai</button>
+      </div>
+      <div className="p2-quick-panel">
+        <h3>Tệp bảo vệ</h3>
+        <p>Ảnh, PDF hoặc Word. Người mua chỉ mở được tệp thuộc phiên bản đã mua.</p>
+        <input ref={protectedInput} type="file" hidden accept={allFiles} disabled={locked} onChange={event=>selectFile(event,'purchased_only')}/>
+        <button type="button" className="button button-secondary" disabled={locked} onClick={()=>protectedInput.current?.click()}>Thêm tệp bảo vệ</button>
+      </div>
+    </div>
+    {disabled && <p>Lưu bản nháp trước khi tải tệp.</p>}
+    {pending && <p role="status">{pending}</p>}
+    {error && <p role="alert" className="auth-error">{error}</p>}
+    {needsReload && <button type="button" className="button button-secondary" disabled={disabled || Boolean(pending)}
+      onClick={()=>void run('Đang cập nhật danh sách…', reload)}>Cập nhật danh sách tệp</button>}
+    <details>
+      <summary>Thay tệp hoặc gửi riêng cho kiểm duyệt</summary>
+      <form className="auth-form" onSubmit={advancedSubmit}><fieldset disabled={locked}>
+        <label>Tệp cần thay<select name="replaceId"><option value="">Thêm tệp mới</option>{detail.files.map(file=><option key={file.id} value={file.id}>{file.originalFilename}</option>)}</select></label>
+        <label>Ai được xem?<select value={advancedAccess} onChange={event=>setAdvancedAccess(event.target.value)}>{Object.entries(accessLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
+        <label>Chọn tệp<input key={advancedAccess} name="file" type="file" accept={advancedAccess==='public_preview'?images:allFiles} required/></label>
+        <button type="submit" className="button button-secondary">Lưu tệp</button>
+      </fieldset></form>
+    </details>
   </section>;
 }

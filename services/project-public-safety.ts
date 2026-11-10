@@ -3,8 +3,10 @@ import {sql} from 'drizzle-orm';
 import {projectVersions as v,projectPrivateData as p} from '../db/schema';
 import {contactPattern,sensitiveProjectKeys} from '../lib/projects/privacy';
 import {protectedParticipantKeys} from '../lib/projects/participants';
+import {publicProjectDataKeys} from '../lib/projects/facts';
 export function safeProjectPublicContent(){
- const text=sql`concat_ws(' ',${v.title},${v.category},${v.provinceCode},${v.districtName},${v.projectStage},${v.publicSummary},${v.publicData}->>'constructionType',${v.publicData}->>'technicalSummary',${v.publicData}->>'scopeSummary')`;
+ const publicFields=sql.join(publicProjectDataKeys.map(key=>sql`${v.publicData}->>${key}::text`),sql`,`);
+ const text=sql`concat_ws(chr(10),${v.title},${v.category},${v.provinceCode},${v.districtName},${v.projectStage},${v.publicSummary},${publicFields})`;
  const participantArray=sql`CASE WHEN jsonb_typeof(${p.privateData}->'participants')='array' THEN ${p.privateData}->'participants' ELSE '[]'::jsonb END`;
  return sql`NOT (${text} ~* ${contactPattern}) AND NOT EXISTS(
   SELECT 1 FROM ${p} CROSS JOIN LATERAL (

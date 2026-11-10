@@ -5,9 +5,11 @@ import {categoryLabels} from './workflow';
 import {projectPrivacyIssues} from './privacy';
 import {templateIssues} from './quick-create';
 import {projectParticipants, type ProjectParticipant} from './participants';
+import {emptyProjectFacts, projectFactFields, projectFactKeys, publicProjectDataKeys, validateProjectFacts} from './facts';
+import {validProjectFileType} from './file-types';
 export { objectInput, revisionInput, uuidInput };
 export type ProjectInput = { title: string; category: string; provinceCode: string | null; districtName: string | null; projectStage: string | null;
-  sizeMinSqm: string | null; sizeMaxSqm: string | null; publicSummary: string; publicData: { constructionType: string; technicalSummary: string; scopeSummary: string };
+  sizeMinSqm: string | null; sizeMaxSqm: string | null; publicSummary: string; publicData: { constructionType: string; technicalSummary: string; scopeSummary: string } & Partial<typeof emptyProjectFacts>;
   pricePoints: bigint; privateData: Record<string, string | ProjectParticipant[]>; rightsConfirmed: boolean; rightsDeclaration: string };
 const pgMax = 9223372036854775807n;
 export function priceInput(value: unknown, configured = process.env.PROJECT_MAX_PRICE_POINTS || '1000000000'): bigint {
@@ -36,7 +38,10 @@ export function projectInput(value: unknown): ProjectInput {
   if (!title || !category) throw new AccessError(400, 'Vui lòng nhập tên và danh mục dự án trước khi lưu nháp.');
   if(!Object.hasOwn(categoryLabels,category))throw new AccessError(400,'Chọn danh mục dự án trong danh sách được hỗ trợ.');
   const publicData = objectInput(body.publicData ?? {});
-  if (Object.keys(publicData).some((key) => !['constructionType', 'technicalSummary', 'scopeSummary'].includes(key))) throw new AccessError(400, 'Thông tin công khai chứa trường không được phép.');
+  if (Object.keys(publicData).some((key) => !publicProjectDataKeys.some(field => field === key))) throw new AccessError(400, 'Thông tin công khai chứa trường không được phép.');
+  const facts = validateProjectFacts(Object.fromEntries(projectFactKeys.map(key =>
+    [key, text(publicData, key, projectFactFields[key].max)])) as typeof emptyProjectFacts);
+  const suppliedFacts = Object.fromEntries(Object.entries(facts).filter(([, field]) => field));
   const privateData = objectInput(body.privateData ?? {});
   if (Object.keys(privateData).some((key) => key !== 'participants' && !Object.hasOwn(privateLabels, key))) throw new AccessError(400, 'Thông tin bảo vệ chứa trường không được hỗ trợ.');
   const participants = projectParticipants(privateData.participants);
@@ -48,7 +53,7 @@ export function projectInput(value: unknown): ProjectInput {
   if (sizeMinSqm && sizeMaxSqm && scaled(sizeMinSqm) > scaled(sizeMaxSqm)) throw new AccessError(400, 'Diện tích tối đa phải lớn hơn hoặc bằng tối thiểu.');
   return { title, category, provinceCode: text(body, 'provinceCode', 20) || null, districtName: text(body, 'districtName', 120) || null,
     projectStage: text(body, 'projectStage', 80) || null, sizeMinSqm, sizeMaxSqm, publicSummary: text(body, 'publicSummary', 5000),
-    publicData: { constructionType: text(publicData, 'constructionType', 120), technicalSummary: text(publicData, 'technicalSummary', 3000), scopeSummary: text(publicData, 'scopeSummary', 240) },
+    publicData: { constructionType: text(publicData, 'constructionType', 120), technicalSummary: text(publicData, 'technicalSummary', 3000), scopeSummary: text(publicData, 'scopeSummary', 240), ...suppliedFacts },
     pricePoints: priceInput(body.pricePoints), privateData: { ...protectedFields, ...(Object.hasOwn(privateData, 'participants') ? { participants } : {}) }, rightsConfirmed: body.rightsConfirmed === true, rightsDeclaration: text(body, 'rightsDeclaration', 1000) };
 }
 export function autoCheck(input: ProjectInput, files: { accessLevel: string; mimeType: string; checksumSha256: string | null }[]): string[] {
@@ -61,7 +66,7 @@ export function autoCheck(input: ProjectInput, files: { accessLevel: string; mim
   if (!input.projectStage) errors.push('Cần bổ sung giai đoạn dự án.');
   if (!Object.entries(input.privateData).some(([key, field]) => key !== 'projectReference' && key !== 'packageScope' && (typeof field === 'string' ? field.trim() : field.length))) errors.push('Cần có thông tin bảo vệ có giá trị cho người mua.');
   if (!input.rightsConfirmed || !input.rightsDeclaration) errors.push('Cần xác nhận và khai báo quyền cung cấp thông tin/tài liệu.');
-  if (files.some((file) => file.mimeType !== 'image/png' || !file.checksumSha256 || !['public_preview', 'purchased_only', 'moderator_only'].includes(file.accessLevel))) errors.push('Một số tệp chưa đạt kiểm tra định dạng hoặc mức truy cập.');
+  if (files.some((file) => !file.checksumSha256 || !validProjectFileType(file.mimeType, file.accessLevel))) errors.push('Một số tệp chưa đạt kiểm tra định dạng hoặc mức truy cập.');
   return errors;
 }
 export function versionCommand(value: unknown): { revision: number; versionId: string } {

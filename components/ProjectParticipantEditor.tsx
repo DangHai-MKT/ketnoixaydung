@@ -1,11 +1,11 @@
 'use client';
 
-import { maxProjectParticipants, participantLimits, participantRoles, participantStatuses, type ProjectParticipant } from '../lib/projects/participants';
+import { maxProjectParticipants, participantLimits, participantRoles, type ProjectParticipant } from '../lib/projects/participants';
 
 const blank: ProjectParticipant = { name:'', role:'unknown', scope:'', stage:'', status:'unverified', source:'', checkedOn:'', contact:'' };
 const fields = [
-  ['scope', 'Hạng mục phụ trách'], ['stage', 'Giai đoạn phụ trách'],
-  ['source', 'Nguồn đối chiếu'], ['checkedOn', 'Ngày đối chiếu'], ['contact', 'Đầu mối công việc'],
+  ['address', 'Địa chỉ đơn vị', 'text'],
+  ['contact', 'Người liên hệ', 'text'], ['phone', 'Điện thoại liên hệ', 'tel'], ['email', 'Email liên hệ', 'email'],
 ] as const;
 
 export default function ProjectParticipantEditor({ rows, onChange }: { rows: ProjectParticipant[]; onChange: (rows: ProjectParticipant[]) => void }) {
@@ -22,11 +22,8 @@ export default function ProjectParticipantEditor({ rows, onChange }: { rows: Pro
         <label>Vai trò<select value={row.role} onChange={event=>update(index,'role',event.target.value as ProjectParticipant['role'])}>
           {Object.entries(participantRoles).map(([key,label])=><option key={key} value={key}>{label}</option>)}
         </select></label>
-        <label>Tình trạng theo nguồn<select value={row.status} onChange={event=>update(index,'status',event.target.value as ProjectParticipant['status'])}>
-          {Object.entries(participantStatuses).map(([key,label])=><option key={key} value={key}>{label}</option>)}
-        </select></label>
-        {fields.map(([key,label])=><label key={key}>{label}<input type={key==='checkedOn'?'date':'text'}
-          required={row.status==='announced'&&(key==='source'||key==='checkedOn')} value={row[key]} maxLength={participantLimits[key]}
+        {fields.map(([key,label,type])=><label key={key}>{label}<input type={type}
+          value={row[key]??''} maxLength={participantLimits[key]}
           onChange={event=>update(index,key,event.target.value)}/></label>)}
       </div>
       <button type="button" className="button button-secondary" onClick={()=>onChange(rows.filter((_,i)=>i!==index))}>Gỡ đơn vị {index + 1}</button>

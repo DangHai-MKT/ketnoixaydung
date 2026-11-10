@@ -1,7 +1,7 @@
 import 'server-only';
 import { and, asc, desc, eq, ilike, inArray, isNull, sql } from 'drizzle-orm';
 import { db } from '../db/client';
-import { projectFiles, projects, projectVersions, sellerProfiles, users, userRoles } from '../db/schema';
+import { projectFiles, projectPrivateData, projects, projectVersions, sellerProfiles, users, userRoles } from '../db/schema';
 import { publicProject } from '../lib/projects/contracts';
 import {projectQuery,searchPattern} from '../lib/projects/query';
 import { AccessError } from '../lib/auth/permissions';
@@ -31,7 +31,7 @@ function mapPublic(row: Awaited<ReturnType<typeof queryPublic>>[number]) {
 async function attachPublicFiles(rows: Awaited<ReturnType<typeof queryPublic>>) {
   if (!rows.length) return [];
   const files = await db.select({ id: projectFiles.id, projectVersionId: projectFiles.projectVersionId }).from(projectFiles)
-    .where(and(inArray(projectFiles.projectVersionId, rows.map((row) => row.versionId)), eq(projectFiles.accessLevel, 'public_preview'), isNull(projectFiles.supersededAt)))
+    .where(and(inArray(projectFiles.projectVersionId, rows.map((row) => row.versionId)), eq(projectFiles.accessLevel, 'public_preview'), eq(projectFiles.mimeType, 'image/png'), isNull(projectFiles.supersededAt)))
     .orderBy(asc(projectFiles.createdAt), asc(projectFiles.id));
   return rows.map((row) => {
     const publicFiles = files.filter((file) => file.projectVersionId === row.versionId).map((file, index) => ({ id: file.id, label: `Ảnh công khai ${index + 1}`, url: `/api/projects/${row.id}/files/${file.id}` }));
@@ -65,7 +65,25 @@ export async function listPublicProjects(params: URLSearchParams) {
 }
 export async function getPublicProject(id: string) {
   const rows = await queryPublic().where(and(publishedConditions(), eq(projects.id, id))).limit(1);
-  return (await attachPublicFiles(rows))[0] ?? null;
+  if (!rows.length) return null;
+  const { versionId } = rows[0];
+  const data = projectPrivateData.privateData;
+  const [publicRows, contents, files] = await Promise.all([
+    attachPublicFiles(rows),
+    db.select({
+      organizations: sql<boolean>`NULLIF(btrim(${data}->>'investorName'), '') IS NOT NULL
+        OR COALESCE(jsonb_path_exists(${data}, '$.participants[*] ? (@.name.type() == "string" && @.name != "")'), false)`,
+      contacts: sql<boolean>`NULLIF(btrim(concat_ws(' ', ${data}->>'contactPerson', ${data}->>'contactPhone', ${data}->>'contactEmail')), '') IS NOT NULL
+        OR COALESCE(jsonb_path_exists(${data}, '$.participants[*] ? (@.contact != "" || @.phone != "" || @.email != "")'), false)`,
+      exactLocation: sql<boolean>`NULLIF(btrim(${data}->>'exactLocation'), '') IS NOT NULL`,
+      notes: sql<boolean>`NULLIF(btrim(concat_ws(' ', ${data}->>'packageScope', ${data}->>'procurementNotes', ${data}->>'technicalNotes')), '') IS NOT NULL`,
+    }).from(projectPrivateData).where(eq(projectPrivateData.projectVersionId, versionId)),
+    db.select({ count: sql<number>`count(*)::int` }).from(projectFiles).where(and(
+      eq(projectFiles.projectVersionId, versionId), eq(projectFiles.accessLevel, 'purchased_only'), isNull(projectFiles.supersededAt),
+    )),
+  ]);
+  const available = contents.at(0) ?? { organizations: false, contacts: false, exactLocation: false, notes: false };
+  return { ...publicRows[0], packageContents: { ...available, documents: files[0].count } };
 }
 export async function listLatestPublicProjects(limit: number) {
   const rows=await queryPublic().where(publishedConditions())

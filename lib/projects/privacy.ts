@@ -1,11 +1,12 @@
 import {protectedParticipantKeys,readProjectParticipants} from './participants';
+import {publicProjectDataKeys} from './facts';
 
 // Identical source is used by JavaScript checks and PostgreSQL public visibility.
 // Avoid regex lookarounds so PostgreSQL and JavaScript interpret it consistently.
 export const contactPattern='[A-Z0-9._%+-]+@[A-Z0-9.-]+[.][A-Z]{2,}|(^|[^0-9])((0[35789])([ .()-]*[0-9]){8}|(0[2])([ .()-]*[0-9]){9}|([+]84|0084)[ .()-]*[235789]([ .()-]*[0-9]){8,9})([^0-9]|$)';
 export const sensitiveProjectKeys=['investorName','projectReference','contactPerson','contactPhone','contactEmail','exactLocation','procurementNotes','technicalNotes'] as const;
 type PublicContent={title:string;category?:string;provinceCode?:string|null;districtName?:string|null;projectStage?:string|null;publicSummary:string;publicData:Record<string,unknown>};
-export function publicContentText(v:PublicContent){return [v.title,v.category,v.provinceCode,v.districtName,v.projectStage,v.publicSummary,v.publicData?.constructionType,v.publicData?.technicalSummary,v.publicData?.scopeSummary].filter(x=>typeof x==='string').join(' ');}
+export function publicContentText(v:PublicContent){return [v.title,v.category,v.provinceCode,v.districtName,v.projectStage,v.publicSummary,...publicProjectDataKeys.map(key=>v.publicData?.[key])].filter(x=>typeof x==='string').join('\n');}
 export function projectPrivacyIssues(v:PublicContent,privateData:Record<string,unknown>={}){
  const text=publicContentText(v),issues:string[]=[];
  if(new RegExp(contactPattern,'i').test(text))issues.push('Phần công khai có số điện thoại hoặc email. Chuyển thông tin liên hệ sang phần được bảo vệ.');
