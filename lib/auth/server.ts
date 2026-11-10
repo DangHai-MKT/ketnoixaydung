@@ -7,6 +7,7 @@ import { db } from '../../db/client';
 import { users, userRoles } from '../../db/schema';
 import { AccessError, isRole, requireActive, requireRoles, type Actor, type Role } from './permissions';
 import { safeErrorCode } from './error-diagnostics';
+import { isSameOrigin } from './request-origin';
 import { randomUUID } from 'node:crypto';
 
 // No cross-request caching: current status and roles are read for every protected request.
@@ -45,7 +46,7 @@ export function accessErrorResponse(error: unknown): Response {
 }
 
 export function requireSameOrigin(request: Request): void {
-  if (request.headers.get('origin') !== new URL(request.url).origin) {
+  if (!isSameOrigin(request)) {
     throw new AccessError(403, 'Nguồn yêu cầu không hợp lệ.');
   }
 }
