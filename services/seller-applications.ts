@@ -1,7 +1,7 @@
 import 'server-only';
-import { and, desc, eq, like } from 'drizzle-orm';
+import { and, desc, eq, inArray, like, ne } from 'drizzle-orm';
 import { db } from '../db/client';
-import { auditLogs, notifications, sellerProfiles, sellerVerificationDocuments } from '../db/schema';
+import { auditLogs, notifications, sellerProfiles, sellerVerificationDocuments, userRoles, users } from '../db/schema';
 import { AccessError, requireActive, requireRoles, type Actor } from '../lib/auth/permissions';
 import { applicationState, assertEditable, assertRevision, sellerReviewRoles } from '../lib/seller/workflow';
 import { applicationInput, missingInformation, revisionInput } from '../lib/seller/validation';
@@ -65,6 +65,16 @@ export async function submitApplication(actorId: string, expectedRevision: unkno
     const [submitted] = await tx.update(sellerProfiles).set({ verificationStatus: 'pending', verificationSubmittedAt: new Date(),
       correctionRequestedAt: null, revision: profile.revision + 1, updatedAt: new Date() }).where(eq(sellerProfiles.id, profile.id)).returning();
     await recordSellerEvent(tx, actorId, submitted, profile.verificationSubmittedAt ? 'seller.application.resubmitted' : 'seller.application.submitted');
+    const recipients = await tx.selectDistinct({ id: users.id }).from(users)
+      .innerJoin(userRoles, eq(users.id, userRoles.userId))
+      .where(and(eq(users.status, 'active'), inArray(userRoles.role, sellerReviewRoles), ne(users.id, actorId)));
+    if (recipients.length) await tx.insert(notifications).values(recipients.map(({ id }) => ({
+      userId: id,
+      type: 'seller.application.review_requested',
+      title: profile.verificationSubmittedAt ? 'Hồ sơ người bán đã được gửi lại' : 'Có hồ sơ người bán chờ duyệt',
+      body: 'Mở hồ sơ để xem thông tin và tài liệu xác minh.',
+      data: { applicationId: submitted.id, href: `/admin/sellers/${submitted.id}` },
+    })));
     return submitted;
   });
 }

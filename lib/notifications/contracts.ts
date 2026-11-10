@@ -1,7 +1,7 @@
 import {AccessError} from '../auth/permissions';
 
 const fixedPaths=new Set(['/account','/account/project-watch','/seller','/seller/application','/seller/transactions','/seller/earnings','/admin/feedback']);
-const detailPaths=/^\/(?:projects|account\/(?:purchases|wallet\/top-ups|refunds|disputes)|seller\/(?:projects|refunds|disputes|withdrawals)|admin\/(?:disputes|refunds))\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+const detailPaths=/^\/(?:projects|account\/(?:purchases|wallet\/top-ups|refunds|disputes)|seller\/(?:projects|refunds|disputes|withdrawals)|admin\/(?:disputes|refunds|sellers))\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 export function notificationHref(value: unknown) {
   return typeof value==='string'&&(fixedPaths.has(value)||detailPaths.test(value))?value:null;
 }
