@@ -14,6 +14,7 @@ export type ProjectDetail = {
   reviews: { id: string; projectVersionId: string; decision: string; reason: string | null; createdAt: string; automatedChecks: { errors?: string[]; passed?: boolean } }[];
   preview: PublicProject; currentPreview: PublicProject | null; currentVersionId: string | null;
   overlapWarning: boolean;
+  missingFileCount: number;
   overlap: { limited: boolean; matches: {
     projectId: string; versionId: string; versionNo: number; title: string;
     stage: string | null; scope: string; finding: OverlapFinding; signals: string[];

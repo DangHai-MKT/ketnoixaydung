@@ -88,5 +88,10 @@ export async function readImage(key: string, namespace: 'seller' | 'project' | '
       if (!current.isFile() || current.size > 10 * 1024 * 1024) throw new Error();
       return await file.readFile();
     } finally { await file.close(); }
-  } catch { throw new AccessError(404, 'Không tìm thấy tài liệu.'); }
+  } catch (error) {
+    if (namespace === 'project' && (error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw new AccessError(503, 'Chưa thể đọc tệp từ thư mục lưu trữ dự án.');
+    }
+    throw new AccessError(404, 'Không tìm thấy tài liệu.');
+  }
 }

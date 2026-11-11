@@ -90,6 +90,11 @@ export async function projectDetail(actor: Actor, id: string, reviewer = false, 
     eq(auditLogs.entityId, project.id), eq(auditLogs.action, 'project.submitted'),
     sql`${auditLogs.metadata}->>'versionId' = ${target.id}`, sql`${auditLogs.metadata}->>'overlapWarning' = 'true'`,
   )).limit(1) : [];
+  const [revisionEvent] = target.versionNo > 1 ? await db.select({ metadata: auditLogs.metadata }).from(auditLogs).where(and(
+    eq(auditLogs.entityId, id), eq(auditLogs.action, 'project.revision_created'),
+    sql`${auditLogs.metadata}->>'versionId' = ${target.id}`,
+  )).limit(1) : [];
+  const missingFileCount = revisionEvent?.metadata.missingFileCount;
   return { project: { id: project.id, sellerId: project.sellerId, slug: project.slug, status: project.status, currentVersion: project.currentVersion, workingVersion: project.workingVersion, revision: project.revision, publishedAt: project.publishedAt },
     sellerInfo: sellerInfo ?? null,
     version: { ...target, pricePoints: target.pricePoints.toString() },
@@ -99,7 +104,8 @@ export async function projectDetail(actor: Actor, id: string, reviewer = false, 
     versions: versions.filter(version=>!reviewer||version.submittedAt||version.approvedAt).map((version) => ({ id: version.id, versionNo: version.versionNo, status: version.submissionStatus ?? (version.approvedAt ? 'published' : 'draft'), approvedAt: version.approvedAt })),
     files: files.map(({ storageKey: _key, ...file }) => ({ ...file, sizeBytes: file.sizeBytes.toString(), url: `/api/projects/${id}/files/${file.id}` })),
     reviews, preview: previewFor(target,files), currentPreview: current?.approvedAt ? previewFor(current,currentFiles) : null,
-    currentVersionId: current?.id ?? null, overlap, overlapWarning: Boolean(overlapEvent) };
+    currentVersionId: current?.id ?? null, overlap, overlapWarning: Boolean(overlapEvent),
+    missingFileCount: typeof missingFileCount === 'number' ? missingFileCount : 0 };
 }
 export async function updateDraft(actor: Actor, id: string, value: unknown) {
   const input = projectInput(value), body = value as Record<string, unknown>;
@@ -182,16 +188,24 @@ export async function proposeRevision(actor: Actor, id: string, expected: number
       dataRightsDeclaration: privateRow.dataRightsDeclaration, dataRightsConfirmedAt: null });
     const files = await activeProjectFiles(tx, source.id);
     if (files.length > uploadLimits().maxDocuments) throw new AccessError(409, 'Phiên bản nguồn có quá nhiều tệp để sao chép.');
-    await checkFileBudget(tx, id, files.length, files.reduce((sum, file) => sum + file.sizeBytes, 0n));
+    const copies: { file: typeof files[number]; bytes: Buffer }[] = [];
     for (const file of files) {
-      const bytes = await verifiedProjectFile(file);
+      try {
+        copies.push({ file, bytes: await verifiedProjectFile(file) });
+      } catch (error) {
+        if (!(error instanceof AccessError) || error.status !== 404) throw error;
+      }
+    }
+    const missingFileCount = files.length - copies.length;
+    await checkFileBudget(tx, id, copies.length, copies.reduce((sum, {file}) => sum + file.sizeBytes, 0n));
+    for (const {file, bytes} of copies) {
       const key = await storeProjectFile(bytes, file.mimeType);
       await tx.insert(projectFiles).values({ projectVersionId: version.id, storageKey: key, originalFilename: file.originalFilename, mimeType: file.mimeType,
         sizeBytes: file.sizeBytes, accessLevel: file.accessLevel, checksumSha256: file.checksumSha256 });
     }
     const [updated] = await tx.update(projects).set({ workingVersion: number, revision: project.revision + 1, updatedAt: new Date(),
       status: ['published', 'paused'].includes(project.status) ? project.status : 'draft' }).where(eq(projects.id, id)).returning();
-    await projectEvent(tx, actor.id, updated, 'project.revision_created', version.id, { sourceVersionId: source.id });
+    await projectEvent(tx, actor.id, updated, 'project.revision_created', version.id, { sourceVersionId: source.id, missingFileCount });
     return { id, revision: updated.revision };
   });
 }
