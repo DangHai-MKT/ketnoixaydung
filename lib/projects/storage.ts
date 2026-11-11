@@ -1,12 +1,28 @@
 import 'server-only';
-import {createHash} from 'node:crypto';
+import {createHash, randomUUID} from 'node:crypto';
 import {AccessError} from '../auth/permissions';
 import { normalizeImage, readImage, storeImage, uploadLimits } from '../seller/storage';
 import { validProjectFileType } from './file-types';
+import {projectR2Storage} from './r2-storage';
 export { uploadLimits };
-export const storeProjectFile = (bytes: Buffer, mimeType: string) => storeImage(bytes, 'project', mimeType !== 'image/png');
+let r2: ReturnType<typeof projectR2Storage> | undefined;
+function remoteStorage() {
+  const driver = process.env.PROJECT_STORAGE_DRIVER || 'local';
+  if (driver === 'local') return undefined;
+  if (driver !== 'r2') throw new AccessError(503, 'Cấu hình kho tệp dự án không hợp lệ.');
+  return r2 ??= projectR2Storage();
+}
+export async function storeProjectFile(bytes: Buffer, mimeType: string) {
+  const storage = remoteStorage();
+  const document = mimeType !== 'image/png';
+  if (!storage) return storeImage(bytes, 'project', document);
+  const key = `${randomUUID()}.${document ? 'blob' : 'png'}`;
+  if (!await storage.writeIfAbsent(key, bytes, mimeType)) throw new AccessError(503, 'Mã lưu trữ tệp đã được dùng. Vui lòng thử lại.');
+  return key;
+}
 export async function verifiedProjectFile(file:{storageKey:string;sizeBytes:bigint;mimeType:string;accessLevel:string;checksumSha256:string|null}){
- const bytes=await readImage(file.storageKey,'project');
+ const storage=remoteStorage();
+ const bytes=storage?await storage.read(file.storageKey):await readImage(file.storageKey,'project');
  if(!validProjectFileType(file.mimeType,file.accessLevel)||!file.checksumSha256||BigInt(bytes.length)!==file.sizeBytes||createHash('sha256').update(bytes).digest('hex')!==file.checksumSha256)throw new AccessError(503,'Tệp dự án không khớp bằng chứng lưu giữ. Cần đối soát trước khi tải hoặc công bố.');
  return bytes;
 }
