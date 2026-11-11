@@ -12,6 +12,15 @@ import { lockActors } from './seller-context';
 import { activeProjectFiles, checkFileBudget, lockProject, projectEvent, workingVersion, versionContent } from './project-context';
 import { findProjectOverlap } from './project-overlap';
 import { readProjectParticipants } from '../lib/projects/participants';
+import { checkProjectPublication } from './project-publication-check';
+
+async function wasPausedBySeller(executor: Pick<typeof db, 'select'>, id: string) {
+  const [event] = await executor.select({ action: auditLogs.action }).from(auditLogs).where(and(
+    eq(auditLogs.entityType, 'project'), eq(auditLogs.entityId, id),
+    inArray(auditLogs.action, ['project.withdrawn', 'project.review.suspend']),
+  )).orderBy(sql`(${auditLogs.metadata}->>'revision')::integer DESC NULLS LAST`, desc(auditLogs.createdAt)).limit(1);
+  return event?.action === 'project.withdrawn';
+}
 
 function publicFields(input: ProjectInput) {
   const { privateData: _private, rightsConfirmed: _confirmed, rightsDeclaration: _declaration, ...fields } = input;
@@ -95,6 +104,7 @@ export async function projectDetail(actor: Actor, id: string, reviewer = false, 
     sql`${auditLogs.metadata}->>'versionId' = ${target.id}`,
   )).limit(1) : [];
   const missingFileCount = revisionEvent?.metadata.missingFileCount;
+  const canRepublish = !reviewer && project.status === 'paused' && Boolean(current?.approvedAt) && await wasPausedBySeller(db, id);
   return { project: { id: project.id, sellerId: project.sellerId, slug: project.slug, status: project.status, currentVersion: project.currentVersion, workingVersion: project.workingVersion, revision: project.revision, publishedAt: project.publishedAt },
     sellerInfo: sellerInfo ?? null,
     version: { ...target, pricePoints: target.pricePoints.toString() },
@@ -104,7 +114,7 @@ export async function projectDetail(actor: Actor, id: string, reviewer = false, 
     versions: versions.filter(version=>!reviewer||version.submittedAt||version.approvedAt).map((version) => ({ id: version.id, versionNo: version.versionNo, status: version.submissionStatus ?? (version.approvedAt ? 'published' : 'draft'), approvedAt: version.approvedAt })),
     files: files.map(({ storageKey: _key, ...file }) => ({ ...file, sizeBytes: file.sizeBytes.toString(), url: `/api/projects/${id}/files/${file.id}` })),
     reviews, preview: previewFor(target,files), currentPreview: current?.approvedAt ? previewFor(current,currentFiles) : null,
-    currentVersionId: current?.id ?? null, overlap, overlapWarning: Boolean(overlapEvent),
+    currentVersionId: current?.id ?? null, canRepublish, overlap, overlapWarning: Boolean(overlapEvent),
     missingFileCount: typeof missingFileCount === 'number' ? missingFileCount : 0 };
 }
 export async function updateDraft(actor: Actor, id: string, value: unknown) {
@@ -117,6 +127,9 @@ export async function updateDraft(actor: Actor, id: string, value: unknown) {
     const version = await workingVersion(tx, project);
     if (version.id !== versionId) throw new AccessError(409, 'Phiên bản đề xuất đã thay đổi.');
     assertDraft(version);
+    if (version.versionNo > 1 && !input.rightsConfirmed) {
+      throw new AccessError(400, 'Hãy xác nhận quyền cung cấp thông tin và tài liệu trước khi lưu bản sửa.');
+    }
     await tx.update(projectVersions).set(publicFields(input)).where(eq(projectVersions.id, version.id));
     if (!Object.hasOwn(input.privateData, 'participants')) {
       const [prior] = await tx.select({ data: projectPrivateData.privateData }).from(projectPrivateData)
@@ -209,7 +222,7 @@ export async function proposeRevision(actor: Actor, id: string, expected: number
     return { id, revision: updated.revision };
   });
 }
-export async function changeListingVisibility(actor: Actor, id: string, expected: number, versionId: string, action: 'archive' | 'withdraw') {
+export async function changeListingVisibility(actor: Actor, id: string, expected: number, versionId: string, action: 'archive' | 'withdraw' | 'republish') {
   return db.transaction(async (tx) => {
     const { project } = await lockProject(tx, actor, id);
     assertProjectRevision(project.revision, expected);
@@ -217,13 +230,23 @@ export async function changeListingVisibility(actor: Actor, id: string, expected
     if (!version) throw new AccessError(404, 'Không tìm thấy phiên bản.');
     if (project.status === 'archived') throw new AccessError(409, 'Dự án đã lưu trữ.');
     if (action === 'withdraw' && project.status !== 'published') throw new AccessError(409, 'Chỉ ngừng công bố tin đang công khai.');
+    if (action === 'republish') {
+      if (project.status !== 'paused' || !await wasPausedBySeller(tx, id)) {
+        throw new AccessError(409, 'Bạn chỉ có thể công bố lại tin do chính mình ngừng công bố.');
+      }
+      if (version.versionNo !== project.currentVersion || !version.approvedAt) {
+        throw new AccessError(409, 'Cần chọn đúng phiên bản hiện hành đã duyệt.');
+      }
+      await checkProjectPublication(tx, version, true);
+    }
     if (action === 'archive' && project.workingVersion) {
       const working = await workingVersion(tx, project);
       await tx.update(projectVersions).set({ submissionStatus: 'archived' }).where(eq(projectVersions.id, working.id));
     }
-    const [updated] = await tx.update(projects).set({ status: action === 'archive' ? 'archived' : 'paused', revision: project.revision + 1,
+    const [updated] = await tx.update(projects).set({ status: action === 'archive' ? 'archived' : action === 'republish' ? 'published' : 'paused', revision: project.revision + 1,
       archivedAt: action === 'archive' ? new Date() : null, updatedAt: new Date() }).where(eq(projects.id, id)).returning();
-    await projectEvent(tx, actor.id, updated, action === 'archive' ? 'project.archived' : 'project.withdrawn', version.id, {}, true);
+    const event = { archive: 'project.archived', withdraw: 'project.withdrawn', republish: 'project.republished' }[action];
+    await projectEvent(tx, actor.id, updated, event, version.id, {}, true);
     return { id, revision: updated.revision };
   });
 }

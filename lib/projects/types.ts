@@ -13,6 +13,7 @@ export type ProjectDetail = {
   files: { id: string; originalFilename: string; accessLevel: string; url: string; sizeBytes: string; mimeType: string }[];
   reviews: { id: string; projectVersionId: string; decision: string; reason: string | null; createdAt: string; automatedChecks: { errors?: string[]; passed?: boolean } }[];
   preview: PublicProject; currentPreview: PublicProject | null; currentVersionId: string | null;
+  canRepublish: boolean;
   overlapWarning: boolean;
   missingFileCount: number;
   overlap: { limited: boolean; matches: {
