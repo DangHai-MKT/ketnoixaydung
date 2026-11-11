@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import {cmsEnabled,type listPublishedNews} from '../services/cms';
 import { categoryLabels, formatPoints } from '../lib/projects/workflow';
 import type { PublicProject } from '../lib/projects/contracts';
+import { projectThumbnailUrl } from '../lib/projects/thumbnail';
 import Icon from './MarketplaceIcon';
 
 function Heading({ icon, title, description, href, children }: { icon: string; title: string; description?: string; href?: string; children?: ReactNode }) {
@@ -18,7 +19,7 @@ function elapsed(value: string | Date | null) {
   return `${Math.floor(minutes / 1440)} ngày trước`;
 }
 function Thumbnail({ project }: { project: PublicProject }) {
-  return <span className={`ml-thumbnail ml-photo-${Object.hasOwn(categoryLabels, project.category) ? project.category : 'other'}`}>{project.imageUrl ? <img src={project.imageUrl} alt="" loading="lazy" /> : <small>Ảnh minh họa</small>}</span>;
+  return <span className={`ml-thumbnail ml-photo-${Object.hasOwn(categoryLabels, project.category) ? project.category : 'other'}`}>{project.imageUrl ? <img src={projectThumbnailUrl(project.imageUrl, 'small')} alt="" loading="lazy" decoding="async" /> : <small>Ảnh minh họa</small>}</span>;
 }
 const needs = [
   { title: 'Dự án sắp đấu thầu', hint: 'Tìm theo giai đoạn', icon: 'file', href: '/projects?stage=Chu%E1%BA%A9n%20b%E1%BB%8B%20%C4%91%E1%BA%A5u%20th%E1%BA%A7u', photo: 'cranes' },

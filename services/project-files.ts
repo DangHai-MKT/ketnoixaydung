@@ -1,5 +1,6 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
+import sharp from 'sharp';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db/client';
 import { projectFiles, projectVersions, projects, sellerProfiles } from '../db/schema';
@@ -43,13 +44,16 @@ export async function uploadProjectFile(actor: Actor, id: string, versionId: str
     return { id: created.id, revision: updated.revision };
   });
 }
-export async function downloadProjectFile(actor: Actor | null, projectId: string, fileId: string) {
+export async function downloadProjectFile(actor: Actor | null, projectId: string, fileId: string, thumbnailWidth?: number) {
   const [row] = await db.select({ file: projectFiles, sellerId: projects.sellerId, submittedAt: projectVersions.submittedAt, approvedAt: projectVersions.approvedAt })
     .from(projectFiles).innerJoin(projectVersions, eq(projectVersions.id, projectFiles.projectVersionId)).innerJoin(projects, eq(projects.id, projectVersions.projectId))
     .where(and(eq(projectFiles.id, fileId), eq(projects.id, projectId)));
   if (!row) throw new AccessError(404, 'Không tìm thấy tệp dự án.');
   const publicListing = row.file.accessLevel === 'public_preview' ? await getPublicProject(projectId) : null;
   const isPublic = !!publicListing?.files.some((file) => file.id === fileId);
+  if (thumbnailWidth && (!isPublic || !row.file.mimeType.startsWith('image/'))) {
+    throw new AccessError(404, 'Không tìm thấy ảnh công khai.');
+  }
   if (!isPublic) {
     requireActive(actor);
     if (actor!.id === row.sellerId) {
@@ -64,9 +68,14 @@ export async function downloadProjectFile(actor: Actor | null, projectId: string
       if (!row.submittedAt && !row.approvedAt) throw new AccessError(403, 'Tệp của bản nháp chưa được gửi xét duyệt.');
     }
   }
-  const bytes = await verifiedProjectFile(row.file);
-  return new Response(new Uint8Array(bytes), { headers: { 'Content-Type': row.file.mimeType, 'Content-Length': String(bytes.length),
-    'Content-Disposition': `${isPublic ? 'inline' : 'attachment'}; filename="du-an-${fileId}.${projectFileExtensions[row.file.mimeType]}"`, 'Cache-Control': 'private, no-store',
+  const original = await verifiedProjectFile(row.file);
+  const bytes = thumbnailWidth
+    ? await sharp(original).resize({ width: thumbnailWidth, height: thumbnailWidth, fit: 'inside', withoutEnlargement: true }).webp({ quality: 76 }).toBuffer()
+    : original;
+  const mimeType = thumbnailWidth ? 'image/webp' : row.file.mimeType;
+  const extension = thumbnailWidth ? 'webp' : projectFileExtensions[row.file.mimeType];
+  return new Response(new Uint8Array(bytes), { headers: { 'Content-Type': mimeType, 'Content-Length': String(bytes.length),
+    'Content-Disposition': `${isPublic ? 'inline' : 'attachment'}; filename="du-an-${fileId}.${extension}"`, 'Cache-Control': 'private, no-store',
     'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; sandbox" } });
 }
 

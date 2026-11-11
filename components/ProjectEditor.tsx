@@ -15,6 +15,7 @@ import {projectPrivacyIssues} from '../lib/projects/privacy';
 import ConfirmActionDialog from './ConfirmActionDialog';
 import ProjectPriceSuggestion from './ProjectPriceSuggestion';
 import {constructionOptions,fillEmptyProjectFields,provinceOptions,quickPrices,quickProjectTemplate,suggestedProjectPrice,rightsOptions,stageOptions,templateIssues} from '../lib/projects/quick-create';
+import ProjectWardPicker from './ProjectWardPicker';
 import { provinceLabel } from '../lib/projects/locations';
 import { emptyProjectFacts, formatInvestmentInput, parseInvestmentInput, projectFactFields, publicProjectDataKeys } from '../lib/projects/facts';
 // Snapshot of the 2025 register from https://provinces.open-api.vn/api/v2/?depth=2.
@@ -76,14 +77,8 @@ export default function ProjectEditor({id,mode='edit',versionId,initialStep=1}:{
     {provinceOptions.map(name=><option key={name} value={name}>{name}</option>)}
    </select>
   </label>;
-  if (key === 'districtName') return <label key={key}>{label}
-   <select value={fields.districtName} disabled={!wardOptions.length && !fields.districtName}
-    onChange={event=>updateFields({districtName:event.target.value})}>
-    <option value="">{wardOptions.length ? 'Chọn phường / xã / đặc khu (nếu biết)' : 'Chọn tỉnh / thành hiện hành trước'}</option>
-    {fields.districtName && !wardOptions.includes(fields.districtName) && <option value={fields.districtName}>{fields.districtName} (đã lưu)</option>}
-    {wardOptions.map(name=><option key={name} value={name}>{name}</option>)}
-   </select>
-  </label>;
+  if (key === 'districtName') return <ProjectWardPicker key={provinceCode} label={label}
+   value={fields.districtName} options={wardOptions} onChange={districtName=>updateFields({districtName})}/>;
   return <label key={key}>{label}{rows?<textarea value={fields[key]} rows={rows} maxLength={key==='publicSummary'?5000:key==='technicalSummary'?3000:key==='scopeSummary'?240:1000} onChange={event=>{setFields({...fields,[key]:event.target.value});setDirty(true);}}/>:<input list={choices[key]?`project-options-${key}`:undefined} value={fields[key]} required={key==='title'} inputMode={key==='pricePoints'?'numeric':key.startsWith('size')?'decimal':undefined} maxLength={key==='title'?300:key==='pricePoints'?19:key==='projectStage'?80:120} onChange={event=>{setFields({...fields,[key]:event.target.value});setDirty(true);}}/>}{choices[key]&&<datalist id={`project-options-${key}`}>{choices[key]?.map(value=><option key={value} value={value}/>)}</datalist>}</label>;
  }
  function factField(key: keyof typeof projectFactFields, label?: string) {

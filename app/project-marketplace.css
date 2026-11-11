@@ -46,3 +46,12 @@
 .project-participant-card dl { margin: 0; display: grid; gap: .5rem; }
 .project-participant-card dt { color: #415e7d; font-size: .8rem; }
 .project-participant-card dd { margin: .15rem 0 0; }
+.project-ward-picker { display: grid; gap: 6px; min-width: 0; align-content: start; }
+.project-ward-picker details { position: relative; }
+.project-ward-picker summary { cursor: pointer; padding: 10px 12px; min-height: 40px; border: 1px solid #cbd9e9; border-radius: 6px; background: #fff; }
+.project-ward-popup { position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 5; padding: 8px; border: 1px solid #cbd9e9; border-radius: 8px; background: #fff; box-shadow: 0 8px 24px #102f5826; }
+.project-ward-popup input { width: 100%; }
+.project-ward-popup ul { list-style: none; padding: 0; margin: 5px 0 0; max-height: 220px; overflow-y: auto; }
+.project-ward-popup button { display: block; width: 100%; padding: 9px; text-align: left; color: #183b63; background: #fff; border: 0; border-radius: 4px; cursor: pointer; }
+.project-ward-popup button:hover, .project-ward-popup button[aria-pressed="true"] { background: #e8f2ff; }
+.project-ward-popup p { margin: 8px 2px 2px; }

@@ -1,4 +1,8 @@
-export const stageOptions=['Chuẩn bị đầu tư','Chuẩn bị đấu thầu','Đang mời thầu','Lựa chọn nhà thầu','Chuẩn bị thi công','Đang thi công','Hoàn thiện','Đã hoàn thành'];
+export const stageOptions=[
+  'Chuẩn bị đầu tư','Thiết kế','Thiết kế cơ sở','Thiết kế kỹ thuật','Thiết kế bản vẽ thi công',
+  'Chuẩn bị đấu thầu','Đang mời thầu','Lựa chọn nhà thầu','Chuẩn bị thi công','Đang thi công',
+  'Tạm dừng','Khởi động lại','Hoàn thiện','Nghiệm thu','Đã hoàn thành',
+];
 export { provinceOptions } from './locations';
 export const constructionOptions:Record<string,string[]>={industrial:['Nhà xưởng','Khu công nghiệp','Kho bãi / logistics','Nhà máy'],civil:['Nhà ở','Chung cư','Khu đô thị','Nhà ở xã hội'],infrastructure:['Đường giao thông','Cầu','Cấp thoát nước','Hạ tầng khu công nghiệp'],energy:['Điện mặt trời','Điện gió','Trạm biến áp','Hệ thống điện'],commercial:['Văn phòng','Trung tâm thương mại','Khách sạn','Khu dịch vụ'],agriculture:['Nhà kính','Trang trại','Kho nông sản','Nhà máy chế biến nông sản'],healthcare:['Bệnh viện','Phòng khám','Trung tâm y tế'],education:['Trường học','Trung tâm đào tạo','Ký túc xá'],other:['Công trình tổng hợp','Công trình khác']};
 export const areaOptions=[{label:'Dưới 1.000 m²',min:'',max:'1000'},{label:'1.000–5.000 m²',min:'1000',max:'5000'},{label:'5.000–20.000 m²',min:'5000',max:'20000'},{label:'20.000–100.000 m²',min:'20000',max:'100000'},{label:'Trên 100.000 m²',min:'100000',max:''}];
