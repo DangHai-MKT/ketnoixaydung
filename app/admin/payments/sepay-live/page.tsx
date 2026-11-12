@@ -29,7 +29,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
           <strong>{labels[row.status] ?? row.status} · {BigInt(row.amountVnd).toLocaleString('vi-VN')} VND</strong>
           <span className="fw-reference">{row.reference ?? 'Không có mã đơn phù hợp'}</span>
           <span>Giao dịch {row.bankReference} · tài khoản …{row.accountLast4}</span>
-          <WalletTime date={row.receivedAt} />
+          {row.reportedReceivedAt && <span>Giờ giao dịch SePay · <WalletTime date={row.reportedReceivedAt} /></span>}
+          <span>Giờ nhận webhook · <WalletTime date={row.receivedAt} /></span>
           {row.creditOutcome === 'credited' && <strong>Đã tự động cộng POINT</strong>}
           {row.creditOutcome === 'already_paid' && <span>Đơn đã được cộng POINT trước đó</span>}
           {row.error && <p>{row.error}</p>}

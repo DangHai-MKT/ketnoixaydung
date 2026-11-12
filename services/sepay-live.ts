@@ -149,7 +149,8 @@ export async function listSepayLiveEvents(actor: Actor, page: number) {
       const receipt = row.payload.receipt as SepayReceipt | undefined;
       return { id: row.id, status: row.processingStatus, error: row.processingError, orderId: row.paymentOrderId,
         creditOutcome: row.payload.creditOutcome === 'credited' ? 'credited' : row.payload.creditOutcome === 'already_paid' ? 'already_paid' : null,
-        receivedAt: row.receivedAt, amountVnd: receipt?.amountVnd ?? '0', reference: receipt?.reference,
+        receivedAt: row.receivedAt, reportedReceivedAt: receipt ? new Date(receipt.receivedAt) : null,
+        amountVnd: receipt?.amountVnd ?? '0', reference: receipt?.reference,
         bankReference: receipt?.bankReference, accountLast4: receipt?.account.slice(-4) };
     }) };
   }, { accessMode: 'read only' });
