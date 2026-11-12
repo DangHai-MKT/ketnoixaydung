@@ -1,11 +1,22 @@
 'use client';
 import BankPicker from './BankPicker';
-import {useRef,useState,useTransition} from 'react';
+import {useEffect,useRef,useState,useTransition} from 'react';
 import {useRouter} from 'next/navigation';
 import ConfirmActionDialog from './ConfirmActionDialog';
 import {approvedTopupPolicy,topupPoints,type TopupPolicy} from '../lib/finance/money';
 import {pointText} from '../lib/finance/labels';
-export function PaymentRefresh(){const router=useRouter(),[pending,start]=useTransition();return <button type="button" className="dash-outline" disabled={pending} onClick={()=>start(()=>router.refresh())}>{pending?'Đang kiểm tra…':'Kiểm tra trạng thái'}</button>;}
+export function PaymentRefresh({watch=false}:{watch?:boolean}={}){
+ const router=useRouter(),[pending,start]=useTransition();
+ useEffect(()=>{
+   if(!watch)return;
+   const interval=window.setInterval(()=>{
+     if(document.visibilityState==='visible')router.refresh();
+   },10_000);
+   const timeout=window.setTimeout(()=>window.clearInterval(interval),120_000);
+   return ()=>{window.clearInterval(interval);window.clearTimeout(timeout);};
+ },[router,watch]);
+ return <button type="button" className="dash-outline" disabled={pending} onClick={()=>start(()=>router.refresh())}>{pending?'Đang kiểm tra…':'Kiểm tra trạng thái'}</button>;
+}
 export default function TopUpForm({rate,policy,testEnvironment}:{rate:{amountVnd:string;points:string;version:number};policy:TopupPolicy;testEnvironment:boolean}){
  const router=useRouter(),key=useRef<string|null>(null),busy=useRef(false);const [amount,setAmount]=useState('100000'),[open,setOpen]=useState(false),[pending,setPending]=useState(false),[error,setError]=useState('');
  let points='',validation='';try{points=topupPoints(amount,rate,policy).points;}catch{validation=`Nhập số tiền từ 100.000 đến 10.000.000 VND, là bội số ${Number(policy.stepVnd).toLocaleString('vi-VN')} VND.`;}

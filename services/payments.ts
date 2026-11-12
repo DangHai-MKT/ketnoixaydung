@@ -3,12 +3,13 @@ import {randomBytes} from 'node:crypto';
 import {and,asc,desc,eq,gt,inArray,isNull,lte,or,sql} from 'drizzle-orm';
 import {setTimeout as delay} from 'node:timers/promises';
 import {db} from '../db/client';
-import {auditLogs,ledgerEntries,ledgerTransactions,notifications,paymentEvents,paymentOrders,systemSettings,userRoles,users,wallets} from '../db/schema';
+import {auditLogs,ledgerEntries,ledgerTransactions,paymentEvents,paymentOrders,systemSettings,userRoles,users,wallets} from '../db/schema';
 import {AccessError,isRole,requireRoles,type Actor,type Role} from '../lib/auth/permissions';
 import {uuidInput} from '../lib/seller/validation';
 import {approvedTopupPolicy,approvedTopupRate,topupPoints,topupPolicyForRate,type TopupPolicy} from '../lib/finance/money';
 import {bankConfigurationInput,bankInstructions,confirmationInput,topupInput,type BankInstructions,paymentQuery} from '../lib/finance/topup';
 import {receiptHash,sepayAutoCreditStart,sepayLivePaymentTime,sepayLiveProvider,sepayLiveWebhookEvent,type SepayReceipt} from '../lib/finance/sepay';
+import {notifyTopupConfirmed} from './notifications';
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 const provider='manual_bank_transfer',financeRoles=['finance_operator','super_admin'] as const;
 export function isTopupTestEnvironment(){try{const u=new URL(process.env.DATABASE_URL||'');return process.env.CONSTRUCTION_AUTH_TEST==='1'&&['postgres:','postgresql:'].includes(u.protocol)&&['localhost','127.0.0.1','[::1]'].includes(u.hostname)&&decodeURIComponent(u.pathname.slice(1))==='construction_marketplace_migration_test'&&[...u.searchParams.keys()].every(k=>k==='sslmode');}catch{return false;}}
@@ -182,7 +183,7 @@ async function confirmationTx(source:ConfirmationSource,id:string,data:ReturnTyp
  await tx.update(paymentOrders).set({status:'paid',providerReference:data.bankReference,paidAt:receivedAt,updatedAt:now}).where(eq(paymentOrders.id,id));
  await tx.insert(paymentEvents).values({paymentOrderId:id,provider,providerEventId:`bank:${data.bankReference}`,eventType:live?'sepay.live.confirmed':'manual.confirmed',signatureValid:Boolean(live),processingStatus:'processed',processedAt:now,payload:{actorId:actor?.id??null,amountVnd:data.amountVnd,bankReference:data.bankReference,receivedAt:receivedAt.toISOString(),reason:data.reason,verifiedReceipt:true,ledgerId:ledger.id,...(live?{webhookId:live.eventId,apiId:live.apiId,reportedReceivedAt:live.receipt.receivedAt}:{})}});
  await tx.insert(auditLogs).values({actorId:actor?.id??null,entityType:'payment_order',entityId:id,action:'topup.confirmed',reason:data.reason,metadata:{ledgerId:ledger.id,bankReference:data.bankReference,amountVnd:data.amountVnd,points:order.pointsToCredit.toString(),method}});
- await tx.insert(notifications).values({userId:order.userId,type:'topup.confirmed',title:'Nạp điểm thành công',body:'Khoản thanh toán đã được đối chiếu và cộng POINT vào ví.',data:{href:`/account/wallet/top-ups/${id}`}});
+ await notifyTopupConfirmed(tx,order,live?'sepay_live':'manual');
  await finishLive('credited');
  return {id,reused:false};});}
 function errorCode(error:unknown){for(let n=0;n<5&&error&&typeof error==='object';n++){const e=error as {code?:string;cause?:unknown};if(e.code)return e.code;error=e.cause;}return '';}

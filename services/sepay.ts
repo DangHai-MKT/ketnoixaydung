@@ -2,7 +2,7 @@ import 'server-only';
 import {randomBytes,createHash} from 'node:crypto';
 import {and,asc,desc,eq,gt,inArray,isNull,lte,or,sql} from 'drizzle-orm';
 import {db} from '../db/client';
-import {auditLogs,ledgerEntries,ledgerTransactions,notifications,paymentEvents,paymentOrders,systemSettings,userRoles,users,wallets} from '../db/schema';
+import {auditLogs,ledgerEntries,ledgerTransactions,paymentEvents,paymentOrders,systemSettings,userRoles,users,wallets} from '../db/schema';
 import {AccessError,requireRoles,type Actor} from '../lib/auth/permissions';
 import {topupInput} from '../lib/finance/topup';
 import {approvedTopupPolicy,topupPoints,topupPolicyForRate,type TopupPolicy} from '../lib/finance/money';
@@ -10,6 +10,7 @@ import {matchSepayApi,parseSepayWebhook,receiptHash,sepayProvider,verifySepaySig
 import {readBoundedBody} from '../lib/seller/http';
 import {financeReadActor} from './finance-read-access';
 import {requireSepayEnvironment,sepayConfiguration} from './sepay-settings';
+import {notifyTopupConfirmed} from './notifications';
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 async function configurationUnchanged(tx:Tx,version:number){await tx.execute(sql`SELECT pg_advisory_xact_lock_shared(72301942)`);const now=new Date(),rows=await tx.select().from(systemSettings).where(and(eq(systemSettings.settingKey,'sepay_test'),lte(systemSettings.effectiveFrom,now),or(isNull(systemSettings.effectiveTo),gt(systemSettings.effectiveTo,now))));if(rows.length!==1||rows[0].version!==version||rows[0].value.enabled!==true)throw new AccessError(409,'Cấu hình SePay Test đã thay đổi. Chưa ghi sổ.');}
 async function buyer(tx:Tx,id:string){const [u]=await tx.select().from(users).where(eq(users.id,id)).for('update');const [role]=await tx.select().from(userRoles).where(and(eq(userRoles.userId,id),eq(userRoles.role,'buyer')));if(u?.status!=='active'||!role)throw new AccessError(409,'Tài khoản người mua không đủ điều kiện nhận điểm.');}
@@ -85,7 +86,7 @@ export async function reconcileSepayEvent(id:string,actor?:Actor){
  await tx.insert(ledgerEntries).values([{transactionId:ledger.id,walletId:owner.id,amount:order.pointsToCredit},{transactionId:ledger.id,walletId:issuer.id,amount:-order.pointsToCredit}]);await tx.update(ledgerTransactions).set({status:'posted',postedAt:now}).where(eq(ledgerTransactions.id,ledger.id));
  await tx.update(paymentOrders).set({status:'paid',providerReference:receipt.bankReference,paidAt:receivedAt,updatedAt:now}).where(eq(paymentOrders.id,order.id));await tx.update(paymentEvents).set({paymentOrderId:order.id,processingStatus:'processed',processedAt:now,processingError:null}).where(eq(paymentEvents.id,id));
  await tx.insert(auditLogs).values({actorId:actor?.id??null,action:'topup.sepay_test.confirmed',entityType:'payment_order',entityId:order.id,metadata:{ledgerId:ledger.id,apiId,mode:'test',amountVnd:receipt.amountVnd,points:amount.points}});
- await tx.insert(notifications).values({userId:order.userId,type:'topup.confirmed',title:'Nạp POINT thử nghiệm thành công',body:'Giao dịch SePay Test đã được đối soát và ghi sổ một lần.',data:{href:'/account/wallet/top-ups/'+order.id}});return {ok:true,reused:false};
+ await notifyTopupConfirmed(tx,order,'sepay_test');return {ok:true,reused:false};
  });
  }catch(error){const message=error instanceof AccessError?error.message:'Đối soát tạm thời chưa hoàn tất. Vui lòng thử lại.';await db.update(paymentEvents).set({processingStatus:'failed',processingError:message}).where(and(eq(paymentEvents.id,id),sql`${paymentEvents.processingStatus}<>'processed'`));if(error instanceof AccessError&&[401,403].includes(error.status))throw error;if(error instanceof AccessError&&error.status!==503)return {ok:false,needsReview:true};throw new AccessError(503,message);}
 }

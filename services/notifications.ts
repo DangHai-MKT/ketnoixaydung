@@ -1,9 +1,30 @@
 import 'server-only';
-import {and,desc,eq,isNull,sql} from 'drizzle-orm';
+import {and,desc,eq,inArray,isNull,ne,sql} from 'drizzle-orm';
 import {db} from '../db/client';
-import {notifications} from '../db/schema';
+import {notifications,userRoles,users} from '../db/schema';
 import {AccessError,requireActive,type Actor} from '../lib/auth/permissions';
 import {notificationHref,type NotificationPage} from '../lib/notifications/contracts';
+import {pointText} from '../lib/finance/labels';
+
+type NotificationTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+export async function notifyTopupConfirmed(tx: NotificationTx, order: {id:string;userId:string;pointsToCredit:bigint;amountVnd:bigint},
+  method: 'manual' | 'sepay_live' | 'sepay_test') {
+  const staff = await tx.selectDistinct({id:users.id}).from(users).innerJoin(userRoles,eq(users.id,userRoles.userId))
+    .where(and(eq(users.status,'active'),inArray(userRoles.role,['super_admin','finance_operator']),ne(users.id,order.userId)));
+  const points = pointText(order.pointsToCredit.toString());
+  const amount = order.amountVnd.toLocaleString('vi-VN') + ' VND';
+  const channel = method === 'manual' ? 'Xác nhận thủ công' : method === 'sepay_live' ? 'Tự động qua SePay Live' : 'SePay Test';
+  await tx.insert(notifications).values([{
+    userId:order.userId,type:'topup.confirmed',
+    title:method==='sepay_test'?'Nạp điểm thử nghiệm thành công':'Nạp điểm thành công',
+    body:`Khoản nạp ${amount} đã được xác nhận. Ví của bạn đã nhận ${points}.`,
+    data:{href:'/account/wallet',orderId:order.id},
+  }, ...staff.map(({id}) => ({
+    userId:id,type:'topup.finance.confirmed',title:method==='sepay_test'?'Đã xác nhận đơn nạp thử nghiệm':'Đã xác nhận đơn nạp',
+    body:`${channel} · ${amount} · Đã cộng ${points}.`,
+    data:{href:`/admin/payments/${order.id}`,orderId:order.id},
+  }))]);
+}
 
 const unreadFor=(id:string)=>and(eq(notifications.userId,id),isNull(notifications.readAt));
 export async function getUnreadCount(actor:Actor) {

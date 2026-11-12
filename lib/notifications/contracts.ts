@@ -1,7 +1,7 @@
 import {AccessError} from '../auth/permissions';
 
-const fixedPaths=new Set(['/account','/account/project-watch','/seller','/seller/application','/seller/transactions','/seller/earnings','/admin/feedback']);
-const detailPaths=/^\/(?:projects|account\/(?:purchases|wallet\/top-ups|refunds|disputes)|seller\/(?:projects|refunds|disputes|withdrawals)|admin\/(?:disputes|refunds|sellers))\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+const fixedPaths=new Set(['/account','/account/wallet','/account/project-watch','/seller','/seller/application','/seller/transactions','/seller/earnings','/admin/feedback']);
+const detailPaths=/^\/(?:projects|account\/(?:purchases|wallet\/top-ups|refunds|disputes)|seller\/(?:projects|refunds|disputes|withdrawals)|admin\/(?:disputes|refunds|sellers|payments))\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const uuidPattern='[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}';
 const projectReviewPath=new RegExp(`^/admin/projects/${uuidPattern}\\?version=${uuidPattern}$`,'i');
 export function notificationHref(value: unknown) {
