@@ -1,12 +1,11 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
-import sharp from 'sharp';
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db/client';
 import { projectFiles, projectVersions, projects, sellerProfiles } from '../db/schema';
 import { AccessError, requireActive, requireRoles, type Actor } from '../lib/auth/permissions';
 import { assertDraft, assertProjectRevision, projectReviewerRoles } from '../lib/projects/workflow';
-import { normalizeProjectFile, verifiedProjectFile, storeProjectFile, uploadLimits } from '../lib/projects/storage';
+import { normalizeProjectFile, readProjectThumbnail, verifiedProjectFile, storeProjectFile, uploadLimits } from '../lib/projects/storage';
 import { projectFileExtensions, validProjectFileType } from '../lib/projects/file-types';
 import { activeProjectFiles, checkFileBudget, lockProject, projectEvent, workingVersion } from './project-context';
 import { getPublicProject } from './public-projects';
@@ -44,7 +43,7 @@ export async function uploadProjectFile(actor: Actor, id: string, versionId: str
     return { id: created.id, revision: updated.revision };
   });
 }
-export async function downloadProjectFile(actor: Actor | null, projectId: string, fileId: string, thumbnailWidth?: number) {
+export async function downloadProjectFile(actor: Actor | null, projectId: string, fileId: string, thumbnailWidth?: number, ifNoneMatch?: string | null) {
   const [row] = await db.select({ file: projectFiles, sellerId: projects.sellerId, submittedAt: projectVersions.submittedAt, approvedAt: projectVersions.approvedAt })
     .from(projectFiles).innerJoin(projectVersions, eq(projectVersions.id, projectFiles.projectVersionId)).innerJoin(projects, eq(projects.id, projectVersions.projectId))
     .where(and(eq(projectFiles.id, fileId), eq(projects.id, projectId)));
@@ -68,14 +67,20 @@ export async function downloadProjectFile(actor: Actor | null, projectId: string
       if (!row.submittedAt && !row.approvedAt) throw new AccessError(403, 'Tệp của bản nháp chưa được gửi xét duyệt.');
     }
   }
-  const original = await verifiedProjectFile(row.file);
-  const bytes = thumbnailWidth
-    ? await sharp(original).resize({ width: thumbnailWidth, height: thumbnailWidth, fit: 'inside', withoutEnlargement: true }).webp({ quality: 76 }).toBuffer()
-    : original;
+  const cacheHeaders: Record<string, string> = { 'Cache-Control': 'private, no-store' };
+  if (thumbnailWidth && row.file.checksumSha256) {
+    const etag = `"thumb-v1-${fileId}-${thumbnailWidth}-${row.file.checksumSha256}"`;
+    cacheHeaders['Cache-Control'] = 'private, no-cache';
+    cacheHeaders.ETag = etag;
+    if (ifNoneMatch?.split(',').some(tag => tag.trim().replace(/^W\//, '') === etag)) {
+      return new Response(null, { status: 304, headers: cacheHeaders });
+    }
+  }
+  const bytes = thumbnailWidth ? await readProjectThumbnail(row.file, thumbnailWidth) : await verifiedProjectFile(row.file);
   const mimeType = thumbnailWidth ? 'image/webp' : row.file.mimeType;
   const extension = thumbnailWidth ? 'webp' : projectFileExtensions[row.file.mimeType];
   return new Response(new Uint8Array(bytes), { headers: { 'Content-Type': mimeType, 'Content-Length': String(bytes.length),
-    'Content-Disposition': `${isPublic ? 'inline' : 'attachment'}; filename="du-an-${fileId}.${extension}"`, 'Cache-Control': 'private, no-store',
+    'Content-Disposition': `${isPublic ? 'inline' : 'attachment'}; filename="du-an-${fileId}.${extension}"`, ...cacheHeaders,
     'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; sandbox" } });
 }
 

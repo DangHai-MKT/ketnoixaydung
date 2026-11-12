@@ -23,14 +23,18 @@ export function projectR2Storage(env: NodeJS.ProcessEnv = process.env) {
     requestChecksumCalculation: 'WHEN_REQUIRED',
     responseChecksumValidation: 'WHEN_REQUIRED',
   });
-  function objectKey(key: string) {
+  function objectKey(key: string, thumbnailWidth?: number) {
     if (!isProjectStorageKey(key)) throw new AccessError(404, 'Không tìm thấy tài liệu.');
+    if (thumbnailWidth) {
+      if (![160, 400, 800].includes(thumbnailWidth)) throw new AccessError(400, 'Kích thước ảnh thu nhỏ không hợp lệ.');
+      return `project-thumbnails/v1/${key}/${thumbnailWidth}.webp`;
+    }
     return `project-files/${key}`;
   }
   const options = () => ({abortSignal: AbortSignal.timeout(15000)});
   return {
-    async read(key: string): Promise<Buffer> {
-      const Key = objectKey(key);
+    async read(key: string, thumbnailWidth?: number): Promise<Buffer> {
+      const Key = objectKey(key, thumbnailWidth);
       try {
         const response = await client.send(new GetObjectCommand({Bucket: bucket, Key}), options());
         if (!response.Body || !response.ContentLength || response.ContentLength > maxProjectFileBytes) {
@@ -44,8 +48,8 @@ export function projectR2Storage(env: NodeJS.ProcessEnv = process.env) {
         throw new AccessError(503, 'Chưa thể đọc tệp từ kho R2.');
       }
     },
-    async writeIfAbsent(key: string, bytes: Buffer, mimeType: string): Promise<boolean> {
-      const Key = objectKey(key);
+    async writeIfAbsent(key: string, bytes: Buffer, mimeType: string, thumbnailWidth?: number): Promise<boolean> {
+      const Key = objectKey(key, thumbnailWidth);
       if (!bytes.length || bytes.length > maxProjectFileBytes) throw new AccessError(413, 'Tệp vượt giới hạn dung lượng.');
       try {
         await client.send(new PutObjectCommand({

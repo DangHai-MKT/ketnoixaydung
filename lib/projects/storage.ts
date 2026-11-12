@@ -1,5 +1,6 @@
 import 'server-only';
 import {createHash, randomUUID} from 'node:crypto';
+import sharp from 'sharp';
 import {AccessError} from '../auth/permissions';
 import { normalizeImage, readImage, storeImage, uploadLimits } from '../seller/storage';
 import { validProjectFileType } from './file-types';
@@ -26,6 +27,29 @@ export async function verifiedProjectFile(file:{storageKey:string;sizeBytes:bigi
  const bytes=storage?await storage.read(file.storageKey):await readImage(file.storageKey,'project');
  if(BigInt(bytes.length)!==file.sizeBytes||createHash('sha256').update(bytes).digest('hex')!==file.checksumSha256)throw new AccessError(503,'Tệp dự án không khớp bằng chứng lưu giữ. Cần đối soát trước khi tải hoặc công bố.');
  return bytes;
+}
+
+export async function readProjectThumbnail(file: Parameters<typeof verifiedProjectFile>[0], width: number) {
+  const storage = remoteStorage();
+  if (storage) {
+    try {
+      return await storage.read(file.storageKey, width);
+    } catch (error) {
+      if (!(error instanceof AccessError) || error.status !== 404) throw error;
+    }
+  }
+  const original = await verifiedProjectFile(file);
+  const thumbnail = await sharp(original)
+    .resize({ width, height: width, fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: 76 }).toBuffer();
+  if (storage) {
+    try {
+      await storage.writeIfAbsent(file.storageKey, thumbnail, 'image/webp', width);
+    } catch {
+      // A cache write failure must not prevent delivery of a verified image.
+    }
+  }
+  return thumbnail;
 }
 
 const docxMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
