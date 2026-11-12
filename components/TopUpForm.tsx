@@ -3,7 +3,7 @@ import BankPicker from './BankPicker';
 import {useEffect,useRef,useState,useTransition} from 'react';
 import {useRouter} from 'next/navigation';
 import ConfirmActionDialog from './ConfirmActionDialog';
-import {approvedTopupPolicy,topupPoints,type TopupPolicy} from '../lib/finance/money';
+import {approvedTopupPolicy,approvedTopupRate,topupPoints,type TopupPolicy} from '../lib/finance/money';
 import {pointText} from '../lib/finance/labels';
 export function PaymentRefresh({watch=false}:{watch?:boolean}={}){
  const router=useRouter(),[pending,start]=useTransition();
@@ -54,7 +54,8 @@ export function BankConfigurationForm({bank,testEnvironment,version,stepVnd}:{ve
 export function TopupRateActivation({active}:{active:boolean}){
  const router=useRouter(),busy=useRef(false);
  const [reason,setReason]=useState(''),[open,setOpen]=useState(false),[pending,setPending]=useState(false),[error,setError]=useState('');
- if(active)return <p className="fw-info">Tỷ giá đang áp dụng: 100.000 VND = 100 POINT.</p>;
+ const rateLabel=approvedTopupRate.amountVnd.toLocaleString('vi-VN')+' VND = '+pointText(String(approvedTopupRate.points));
+ if(active)return <p className="fw-info">Tỷ giá đang áp dụng: {rateLabel}.</p>;
  async function activate(){
   if(busy.current)return;
   busy.current=true;setPending(true);setError('');
@@ -67,12 +68,12 @@ export function TopupRateActivation({active}:{active:boolean}){
   finally{busy.current=false;setPending(false);}
  }
  return <><form className="identity-form" onSubmit={event=>{event.preventDefault();setOpen(true);}}>
-  <p>Đơn nạp mới sẽ áp dụng 100.000 VND = 100 POINT. Đơn đã tạo giữ tỷ giá đã chốt.</p>
+  <p>Đơn nạp mới sẽ áp dụng {rateLabel}. Đơn đã tạo giữ tỷ giá đã chốt.</p>
   <label>Lý do đổi tỷ giá<textarea required minLength={10} maxLength={2000} value={reason} onChange={event=>setReason(event.target.value)}/></label>
   <button className="dash-primary" type="submit" disabled={pending}>Xem lại thay đổi</button>
  </form>{error&&<p role="alert" className="auth-error">{error}</p>}
  <ConfirmActionDialog open={open} pending={pending} title="Áp dụng tỷ giá nạp mới?" confirmLabel="Áp dụng tỷ giá mới"
   onClose={()=>{if(!pending)setOpen(false);}} onConfirm={activate}>
-  <p>100.000 VND = 100 POINT. Số tiền nạp phải là bội số {Number(approvedTopupPolicy.stepVnd).toLocaleString('vi-VN')} VND.</p>
+  <p>{rateLabel}. Số tiền nạp phải là bội số {Number(approvedTopupPolicy.stepVnd).toLocaleString('vi-VN')} VND.</p>
  </ConfirmActionDialog></>;
 }

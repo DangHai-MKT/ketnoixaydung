@@ -40,10 +40,17 @@ export async function getTopupRate(){
  const rate={amountVnd:String(value.amountVnd),points:String(value.points),version};
  return {rate,policy:topupPolicyForRate(rate)};
 }
-export async function getBankConfiguration(actor:Actor){await readActor(actor,['super_admin']);const [[row],pricing]=await Promise.all([
+function matchesApprovedTopup(rate:Record<string,unknown>,policy?:Record<string,unknown>){
+ return String(rate.amountVnd)===String(approvedTopupRate.amountVnd)&&String(rate.points)===String(approvedTopupRate.points)&&
+  Object.entries(approvedTopupPolicy).every(([key,value])=>policy?.[key]===value);
+}
+export async function getBankConfiguration(actor:Actor){await readActor(actor,['super_admin']);const now=new Date();const [[row],pricing,policies]=await Promise.all([
  db.select({value:systemSettings.value,version:systemSettings.version}).from(systemSettings).where(eq(systemSettings.settingKey,'manual_bank_transfer')).orderBy(desc(systemSettings.version)).limit(1),
  getTopupRate().catch(error=>{if(error instanceof AccessError)return null;throw error;}),
- ]);return {bank:row?.value??null,version:row?.version??0,policy:pricing?.policy??approvedTopupPolicy,pricing,testEnvironment:isTopupTestEnvironment()};}
+ db.select({value:systemSettings.value}).from(systemSettings).where(and(eq(systemSettings.settingKey,'manual_topup_policy'),
+  lte(systemSettings.effectiveFrom,now),or(isNull(systemSettings.effectiveTo),gt(systemSettings.effectiveTo,now)))),
+ ]);return {bank:row?.value??null,version:row?.version??0,policy:pricing?.policy??approvedTopupPolicy,pricing,
+  approvedRateActive:Boolean(pricing&&policies.length===1&&matchesApprovedTopup(pricing.rate,policies[0].value)),testEnvironment:isTopupTestEnvironment()};}
 export async function activateTopupRate(actor:Actor,input:unknown){
  const data=input as Record<string,unknown>|null;
  const reason=typeof data?.reason==='string'?data.reason.trim():'';
@@ -59,8 +66,7 @@ export async function activateTopupRate(actor:Actor,input:unknown){
   const rates=active.filter(row=>row.settingKey==='topup_rate'),policies=active.filter(row=>row.settingKey==='manual_topup_policy');
   if(rates.length!==1||policies.length>1)throw new AccessError(409,'Cấu hình nạp hiện tại bị thiếu hoặc chồng lấn.');
   const rate={amountVnd:rates[0].value.amountVnd,points:rates[0].value.points};
-  if(topupPolicyForRate(rate).stepVnd===approvedTopupPolicy.stepVnd&&policies[0]){
-   topupPoints(approvedTopupPolicy.minVnd,rate,policies[0].value);
+  if(matchesApprovedTopup(rate,policies[0]?.value)){
    return {ok:true,reused:true};
   }
   const from=new Date(Math.max(now.getTime(),...active.map(row=>row.effectiveFrom.getTime()+1)));

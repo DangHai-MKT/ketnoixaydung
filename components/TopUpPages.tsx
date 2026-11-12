@@ -8,6 +8,7 @@ import {IdentityHeader} from './PhaseOneUI';
 import {DashboardPanel} from './DashboardPanels';
 import {WalletTime} from './WalletTransactions';
 import {pointText} from '../lib/finance/labels';
+import TopupSuccessDialog from './TopupSuccessDialog';
 import TopUpForm,{PaymentRefresh,ConfirmTopupForm,BankConfigurationForm} from './TopUpForm';
 type Params=Promise<Record<string,string|string[]|undefined>>;
 const roles=['finance_operator','super_admin'] as const;
@@ -32,6 +33,7 @@ export async function TopupDetail({params,admin=false}:{params:Promise<{id:strin
  const pending=order.status==='pending'&&!order.overdue&&!order.needsReview;
  return <main className="fw-page"><IdentityHeader rootHref={base} rootLabel={admin?'Đơn nạp và đối chiếu':'Lịch sử đơn nạp'} title="Chi tiết đơn nạp" description="Kiểm tra số tiền, thời hạn và trạng thái xác nhận của đơn."/>
  {order.testEnvironment&&<p className="fw-info">Môi trường kiểm thử — không chuyển tiền thật. Cấu hình mô phỏng không phải thông tin ngân hàng nhận tiền.</p>}
+ {!admin && order.status==='paid' && <TopupSuccessDialog orderId={order.id} points={order.points}/> }
  {(!admin && order.status==='paid') && <DashboardPanel title="Nạp điểm thành công" icon="wallet"><p role="status">Ví của bạn đã nhận <strong>{pointText(order.points)}</strong>.</p><div className="fw-actions"><a className="dash-primary" href="/account/wallet">Xem tổng điểm</a></div></DashboardPanel>}
  <DashboardPanel title={order.overdue?'Đơn đã quá hạn':paymentLabels[order.status]} icon="wallet"><dl className="fw-details"><dt>Mã đơn</dt><dd className="fw-reference">{order.id}</dd><dt>Số tiền</dt><dd>{BigInt(order.amountVnd).toLocaleString('vi-VN')} VND</dd><dt>POINT theo đơn</dt><dd>{pointText(order.points)}</dd><dt>Ngày tạo</dt><dd><WalletTime date={order.createdAt}/></dd><dt>Hạn thanh toán</dt><dd>{order.expiresAt?<WalletTime date={order.expiresAt}/>:'Cần đối soát riêng'}</dd><dt>Ngày tiền vào đã xác nhận</dt><dd>{order.paidAt?<WalletTime date={order.paidAt}/>:'Chưa xác nhận'}</dd><dt>Tỷ giá đã chốt</dt><dd>{order.rate?BigInt(order.rate.amountVnd).toLocaleString('vi-VN')+' VND = '+pointText(order.rate.points)+' · phiên bản '+order.rate.version:'Cần đối soát riêng'}</dd></dl><div className="fw-actions"><PaymentRefresh watch={!admin&&pending}/>{!admin&&<a href="/account/wallet">Xem ví điểm →</a>}</div></DashboardPanel>
  {order.needsReview?<p className="fw-info">Đơn chưa đủ thông tin đối chiếu hoặc thuộc phương thức khác. Cần đối soát riêng, không tự động cộng điểm hoặc cung cấp hướng dẫn thanh toán.</p>:order.bank&&<DashboardPanel title={pending?(order.provider==='sepay_test'?'Hướng dẫn mô phỏng SePay Test':'Hướng dẫn chuyển khoản'):'Thông tin tài khoản nhận đã chốt'} icon="file">

@@ -1,7 +1,7 @@
 import {AccessError} from '../auth/permissions';
-export const approvedTopupRate={amountVnd:100000,points:100} as const;
-export const approvedTopupPolicy={minVnd:'100000',maxVnd:'10000000',stepVnd:'1000',expiresHours:24,ledgerModel:'point_issuance_v1'} as const;
-export const legacyTopupPolicy={...approvedTopupPolicy,stepVnd:'100'} as const;
+export const approvedTopupRate={amountVnd:100000,points:1000} as const;
+export const approvedTopupPolicy={minVnd:'100000',maxVnd:'10000000',stepVnd:'100',expiresHours:24,ledgerModel:'point_issuance_v1'} as const;
+export const legacyTopupPolicy={...approvedTopupPolicy,stepVnd:'1000'} as const;
 export type TopupPolicy=(typeof approvedTopupPolicy|typeof legacyTopupPolicy)&{version:number};
 export function positiveInteger(value:unknown){
  if(typeof value==='number'&&Number.isSafeInteger(value)&&value>0)return BigInt(value);
@@ -10,8 +10,8 @@ export function positiveInteger(value:unknown){
 }
 export function topupPolicyForRate(rate:{amountVnd:unknown;points:unknown}){
  const base=positiveInteger(rate.amountVnd),points=positiveInteger(rate.points);
- if(base===1000n*points)return approvedTopupPolicy;
- if(base===100n*points)return legacyTopupPolicy;
+ if(base===100n*points)return approvedTopupPolicy;
+ if(base===1000n*points)return legacyTopupPolicy;
  throw new AccessError(503,'Tỷ giá nạp chưa được duyệt.');
 }
 export function topupPoints(amount:unknown,rate:{amountVnd:unknown;points:unknown},policy:Record<string,unknown>){
