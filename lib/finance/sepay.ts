@@ -28,6 +28,23 @@ export function parseSepayWebhook(body:Uint8Array){
  return {eventId:String(v.id),account,bank,bankReference:reference,amountVnd:sepayAmount(v.transferAmount),direction:String(v.transferType),receivedAt:sepayDate(v.transactionDate),reference:sepayReference(content,v.code),contentHash:createHash('sha256').update(content).digest('hex')};
 }
 export type SepayReceipt=ReturnType<typeof parseSepayWebhook>;
+export function sepayLivePaymentTime(
+ receipt: Pick<SepayReceipt, 'bank' | 'receivedAt'>,
+ order: {createdAt:Date;expiresAt:Date|null},
+ webhookReceivedAt: Date,
+) {
+ const reported = Date.parse(receipt.receivedAt);
+ const created = order.createdAt.getTime();
+ const expires = order.expiresAt?.getTime();
+ const webhook = webhookReceivedAt.getTime();
+ if (!Number.isFinite(reported) || expires === undefined || reported >= expires || reported > webhook) return null;
+ if (reported >= created) return new Date(reported);
+ // MBBank may report only the minute. Accept an overlapping minute only
+ // when the authenticated webhook was already received within that minute.
+ if (receipt.bank === 'MBBank' && reported % 60_000 === 0 &&
+   webhook >= created && webhook < reported + 60_000 && webhook < expires) return order.createdAt;
+ return null;
+}
 export function receiptHash(receipt:SepayReceipt){return createHash('sha256').update(JSON.stringify(Object.keys(receipt).sort().map(key=>[key,receipt[key as keyof SepayReceipt]]))).digest('hex');}
 export function matchSepayApi(receipt:SepayReceipt,value:unknown,accountId:string){
  const v=value as Record<string,unknown>;

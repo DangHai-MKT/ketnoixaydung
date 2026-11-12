@@ -3,7 +3,7 @@ import { and, desc, eq, ne } from 'drizzle-orm';
 import { db } from '../db/client';
 import { paymentEvents, paymentOrders } from '../db/schema';
 import { AccessError, type Actor } from '../lib/auth/permissions';
-import { matchSepayApi, parseSepayWebhook, receiptHash, sepayAutoCreditStart, sepayLiveProvider, sepayLiveWebhookEvent, verifySepaySignature, type SepayReceipt } from '../lib/finance/sepay';
+import { matchSepayApi, parseSepayWebhook, receiptHash, sepayAutoCreditStart, sepayLivePaymentTime, sepayLiveProvider, sepayLiveWebhookEvent, verifySepaySignature, type SepayReceipt } from '../lib/finance/sepay';
 import { readBoundedBody } from '../lib/seller/http';
 import { financeReadActor } from './finance-read-access';
 import { sepayConfiguration } from './sepay-settings';
@@ -28,7 +28,8 @@ async function verifyLiveReceipt(receipt: SepayReceipt, config: Awaited<ReturnTy
   } catch {
     throw new AccessError(503, 'Chưa kết nối được API SePay Live.');
   }
-  if (response.status === 401 || response.status === 403) throw new AccessError(503, 'SePay Live từ chối API Token. Kiểm tra token trên SePay.');
+  if (response.status === 401) throw new AccessError(503, 'SePay Live trả HTTP 401 khi gọi API giao dịch. Kiểm tra API Token Live đã lưu.');
+  if (response.status === 403) throw new AccessError(503, 'SePay Live trả HTTP 403 khi gọi API giao dịch từ máy chủ. Kiểm tra quyền truy cập với SePay.');
   if (response.status === 429) throw new AccessError(503, 'SePay Live giới hạn lượt gọi. Thử đối soát lại sau.');
   if (!response.ok) throw new AccessError(503, 'API SePay Live chưa trả về dữ liệu giao dịch.');
   let result: { status?: string; data?: { id: string }[]; meta?: { pagination?: { has_more?: boolean; last_page?: number } } };
@@ -49,7 +50,7 @@ async function verifyLiveReceipt(receipt: SepayReceipt, config: Awaited<ReturnTy
   return result.data[0].id;
 }
 
-async function findManualOrder(receipt: SepayReceipt) {
+async function findManualOrder(receipt: SepayReceipt, webhookReceivedAt: Date) {
   if (!receipt.reference) throw new AccessError(409, 'Nội dung chưa có mã đơn nạp duy nhất.');
   const [reference] = await db.select({ orderId: paymentEvents.paymentOrderId }).from(paymentEvents)
     .where(and(eq(paymentEvents.provider, manualProvider), eq(paymentEvents.providerEventId, 'transfer:' + receipt.reference)));
@@ -67,8 +68,7 @@ async function findManualOrder(receipt: SepayReceipt) {
       row.snapshot.transferReference !== receipt.reference) {
     throw new AccessError(409, 'Tài khoản nhận, số tiền hoặc mã chuyển khoản không khớp đơn nạp.');
   }
-  const receivedAt = Date.parse(receipt.receivedAt);
-  if (!row.expiresAt || receivedAt < row.createdAt.getTime() || receivedAt >= row.expiresAt.getTime()) {
+  if (!sepayLivePaymentTime(receipt, row, webhookReceivedAt)) {
     throw new AccessError(409, 'Giao dịch đến ngoài thời hạn của đơn nạp.');
   }
   return row;
@@ -91,7 +91,7 @@ async function reconcile(eventId: string) {
       return;
     }
     const apiId = await verifyLiveReceipt(receipt, config);
-    const order = await findManualOrder(receipt);
+    const order = await findManualOrder(receipt, event.receivedAt);
     const start = sepayAutoCreditStart(process.env.SEPAY_LIVE_AUTO_CREDIT_FROM);
     if (start && order.createdAt >= start && new Date(receipt.receivedAt) >= start) {
       await confirmSepayLiveTopup(order.id, { eventId, apiId, configurationVersion: config.version, receipt });

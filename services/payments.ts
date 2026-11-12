@@ -8,7 +8,7 @@ import {AccessError,isRole,requireRoles,type Actor,type Role} from '../lib/auth/
 import {uuidInput} from '../lib/seller/validation';
 import {approvedTopupPolicy,approvedTopupRate,topupPoints,topupPolicyForRate,type TopupPolicy} from '../lib/finance/money';
 import {bankConfigurationInput,bankInstructions,confirmationInput,topupInput,type BankInstructions,paymentQuery} from '../lib/finance/topup';
-import {receiptHash,sepayAutoCreditStart,sepayLiveProvider,sepayLiveWebhookEvent,type SepayReceipt} from '../lib/finance/sepay';
+import {receiptHash,sepayAutoCreditStart,sepayLivePaymentTime,sepayLiveProvider,sepayLiveWebhookEvent,type SepayReceipt} from '../lib/finance/sepay';
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 const provider='manual_bank_transfer',financeRoles=['finance_operator','super_admin'] as const;
 export function isTopupTestEnvironment(){try{const u=new URL(process.env.DATABASE_URL||'');return process.env.CONSTRUCTION_AUTH_TEST==='1'&&['postgres:','postgresql:'].includes(u.protocol)&&['localhost','127.0.0.1','[::1]'].includes(u.hostname)&&decodeURIComponent(u.pathname.slice(1))==='construction_marketplace_migration_test'&&[...u.searchParams.keys()].every(k=>k==='sslmode');}catch{return false;}}
@@ -165,7 +165,8 @@ async function confirmationTx(source:ConfirmationSource,id:string,data:ReturnTyp
  await finishLive('already_paid');return {id,reused:true};}
  if(liveEvent?.processingStatus==='processed')throw new AccessError(409,'Webhook đã được xử lý trước đó. Cần kiểm tra đơn trong quản trị.');
  const now=new Date();if(order.status!=='pending'||!order.expiresAt||order.expiresAt<=now)throw new AccessError(409,'Đơn đã hết hạn hoặc không ở trạng thái chờ. Tiền đến muộn cần đối soát riêng.');
- const receivedAt=new Date(data.receivedAt);if(receivedAt>now||receivedAt<order.createdAt||receivedAt>order.expiresAt)throw new AccessError(409,'Thời gian tiền vào không phù hợp thời hạn của đơn.');
+ const receivedAt=live&&liveEvent?sepayLivePaymentTime(live.receipt,order,liveEvent.receivedAt):new Date(data.receivedAt);
+ if(!receivedAt||receivedAt>now||receivedAt<order.createdAt||receivedAt>order.expiresAt)throw new AccessError(409,'Thời gian tiền vào không phù hợp thời hạn của đơn.');
  const [duplicate]=await tx.select({id:paymentOrders.id}).from(paymentOrders).where(and(eq(paymentOrders.provider,provider),eq(paymentOrders.providerReference,data.bankReference)));if(duplicate)throw new AccessError(409,'Mã giao dịch ngân hàng đã được dùng cho một đơn nạp.');
  if(live)await tx.insert(paymentEvents).values({paymentOrderId:id,provider:sepayLiveProvider,providerEventId:`api:${live.apiId}`,
   eventType:'sepay.live.claimed',signatureValid:true,processingStatus:'processed',processedAt:now,payload:{webhookId:live.eventId}});
@@ -179,7 +180,7 @@ async function confirmationTx(source:ConfirmationSource,id:string,data:ReturnTyp
  await tx.insert(ledgerEntries).values([{transactionId:ledger.id,walletId:owner.id,amount:order.pointsToCredit},{transactionId:ledger.id,walletId:issuer.id,amount:-order.pointsToCredit}]);
  await tx.update(ledgerTransactions).set({status:'posted',postedAt:now}).where(eq(ledgerTransactions.id,ledger.id));
  await tx.update(paymentOrders).set({status:'paid',providerReference:data.bankReference,paidAt:receivedAt,updatedAt:now}).where(eq(paymentOrders.id,id));
- await tx.insert(paymentEvents).values({paymentOrderId:id,provider,providerEventId:`bank:${data.bankReference}`,eventType:live?'sepay.live.confirmed':'manual.confirmed',signatureValid:Boolean(live),processingStatus:'processed',processedAt:now,payload:{actorId:actor?.id??null,amountVnd:data.amountVnd,bankReference:data.bankReference,receivedAt:data.receivedAt,reason:data.reason,verifiedReceipt:true,ledgerId:ledger.id,...(live?{webhookId:live.eventId,apiId:live.apiId}:{})}});
+ await tx.insert(paymentEvents).values({paymentOrderId:id,provider,providerEventId:`bank:${data.bankReference}`,eventType:live?'sepay.live.confirmed':'manual.confirmed',signatureValid:Boolean(live),processingStatus:'processed',processedAt:now,payload:{actorId:actor?.id??null,amountVnd:data.amountVnd,bankReference:data.bankReference,receivedAt:receivedAt.toISOString(),reason:data.reason,verifiedReceipt:true,ledgerId:ledger.id,...(live?{webhookId:live.eventId,apiId:live.apiId,reportedReceivedAt:live.receipt.receivedAt}:{})}});
  await tx.insert(auditLogs).values({actorId:actor?.id??null,entityType:'payment_order',entityId:id,action:'topup.confirmed',reason:data.reason,metadata:{ledgerId:ledger.id,bankReference:data.bankReference,amountVnd:data.amountVnd,points:order.pointsToCredit.toString(),method}});
  await tx.insert(notifications).values({userId:order.userId,type:'topup.confirmed',title:'Nạp điểm thành công',body:'Khoản thanh toán đã được đối chiếu và cộng POINT vào ví.',data:{href:`/account/wallet/top-ups/${id}`}});
  await finishLive('credited');
