@@ -3,13 +3,14 @@ import { and, desc, eq, ne } from 'drizzle-orm';
 import { db } from '../db/client';
 import { paymentEvents, paymentOrders } from '../db/schema';
 import { AccessError, type Actor } from '../lib/auth/permissions';
-import { matchSepayApi, parseSepayWebhook, receiptHash, verifySepaySignature, type SepayReceipt } from '../lib/finance/sepay';
+import { matchSepayApi, parseSepayWebhook, receiptHash, sepayAutoCreditStart, sepayLiveProvider, sepayLiveWebhookEvent, verifySepaySignature, type SepayReceipt } from '../lib/finance/sepay';
 import { readBoundedBody } from '../lib/seller/http';
 import { financeReadActor } from './finance-read-access';
 import { sepayConfiguration } from './sepay-settings';
+import { confirmSepayLiveTopup } from './payments';
 
-const provider = 'sepay_live';
-const eventType = 'sepay.live.webhook';
+const provider = sepayLiveProvider;
+const eventType = sepayLiveWebhookEvent;
 const manualProvider = 'manual_bank_transfer';
 const liveEvents = and(eq(paymentEvents.provider, provider), eq(paymentEvents.eventType, eventType));
 
@@ -91,6 +92,11 @@ async function reconcile(eventId: string) {
     }
     const apiId = await verifyLiveReceipt(receipt, config);
     const order = await findManualOrder(receipt);
+    const start = sepayAutoCreditStart(process.env.SEPAY_LIVE_AUTO_CREDIT_FROM);
+    if (start && order.createdAt >= start && new Date(receipt.receivedAt) >= start) {
+      await confirmSepayLiveTopup(order.id, { eventId, apiId, configurationVersion: config.version, receipt });
+      return;
+    }
     await db.update(paymentEvents).set({
       paymentOrderId: order.id, processingStatus: 'processed', processedAt: new Date(),
       processingError: null, payload: { ...event.payload, apiId },
@@ -142,6 +148,7 @@ export async function listSepayLiveEvents(actor: Actor, page: number) {
     return { page, hasMore: rows.length > 20, rows: rows.slice(0, 20).map(row => {
       const receipt = row.payload.receipt as SepayReceipt | undefined;
       return { id: row.id, status: row.processingStatus, error: row.processingError, orderId: row.paymentOrderId,
+        creditOutcome: row.payload.creditOutcome === 'credited' ? 'credited' : row.payload.creditOutcome === 'already_paid' ? 'already_paid' : null,
         receivedAt: row.receivedAt, amountVnd: receipt?.amountVnd ?? '0', reference: receipt?.reference,
         bankReference: receipt?.bankReference, accountLast4: receipt?.account.slice(-4) };
     }) };

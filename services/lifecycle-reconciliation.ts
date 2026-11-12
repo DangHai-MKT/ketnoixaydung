@@ -40,7 +40,23 @@ async function paymentChecks(tx:Tx,p:typeof paymentOrders.$inferSelect,f:Finding
  if(created.length!==1||snapshot?.schemaVersion!==1||snapshot?.amountVnd!==p.amountVnd.toString()||snapshot?.points!==p.pointsToCredit.toString()||rate?.version!==p.exchangeRateVersion)review(f,'TOPUP_SNAPSHOT','Thiếu hoặc sai bản chốt quy đổi của đơn nạp.');
  if(p.paidAt&&(!p.expiresAt||p.paidAt<p.createdAt||p.paidAt>p.expiresAt||l.postedAt&&l.postedAt<p.paidAt))review(f,'TOPUP_TIMING','Thời điểm nhận tiền hoặc ghi sổ không khớp thời hạn đơn đã chốt.');
  if(snapshot&&rate)await check(f,'TOPUP_POLICY',async()=>{if(!snapshot.policy||typeof snapshot.policy!=='object'||Array.isArray(snapshot.policy))throw new AccessError(409,'Bản chốt chính sách nạp không hợp lệ.');const conversion=topupPoints(p.amountVnd.toString(),{amountVnd:rate.amountVnd,points:rate.points},snapshot.policy as Record<string,unknown>);if(conversion.points!==p.pointsToCredit.toString())throw new AccessError(409,'Số điểm không khớp tỷ giá đã chốt.');return conversion;});
- if(p.provider==='manual_bank_transfer'){const confirmation=events.filter(e=>e.provider===p.provider&&e.eventType==='manual.confirmed'&&e.processingStatus==='processed'&&e.payload.verifiedReceipt===true&&e.payload.ledgerId===l.id&&e.payload.amountVnd===p.amountVnd.toString()&&e.payload.bankReference===p.providerReference&&typeof e.payload.receivedAt==='string'&&Date.parse(e.payload.receivedAt)===p.paidAt?.getTime());if(confirmation.length!==1)review(f,'MANUAL_RECEIPT','Chưa xác minh được duy nhất một bằng chứng đối chiếu chuyển khoản.');}
+ if(p.provider==='manual_bank_transfer'){
+  const confirmations=events.filter(e=>e.provider===p.provider&&['manual.confirmed','sepay.live.confirmed'].includes(e.eventType)&&
+   e.providerEventId==='bank:'+p.providerReference&&e.processingStatus==='processed'&&e.payload.verifiedReceipt===true&&e.payload.ledgerId===l.id&&
+   e.payload.amountVnd===p.amountVnd.toString()&&e.payload.bankReference===p.providerReference&&
+   typeof e.payload.receivedAt==='string'&&Date.parse(e.payload.receivedAt)===p.paidAt?.getTime());
+  if(confirmations.length!==1)review(f,'MANUAL_RECEIPT','Chưa xác minh được duy nhất một bằng chứng đối chiếu chuyển khoản.');
+  const confirmation=confirmations[0];
+  if(confirmation?.eventType==='sepay.live.confirmed'){
+   const proof=events.filter(e=>e.provider==='sepay_live'&&e.signatureValid&&e.processingStatus==='processed');
+   if(!confirmation.signatureValid||l.metadata.method!=='sepay_live'||l.metadata.apiId!==confirmation.payload.apiId||
+    l.metadata.webhookId!==confirmation.payload.webhookId||
+    !proof.some(e=>e.eventType==='sepay.live.webhook'&&e.id===confirmation.payload.webhookId&&e.payload.apiId===confirmation.payload.apiId&&e.payload.creditOutcome==='credited')||
+    !proof.some(e=>e.eventType==='sepay.live.claimed'&&e.providerEventId==='api:'+confirmation.payload.apiId&&e.payload.webhookId===confirmation.payload.webhookId)){
+    review(f,'SEPAY_LIVE_RECEIPT','Thiếu bằng chứng webhook hoặc API của bút toán SePay Live.');
+   }
+  }
+ }
  else if(p.provider==='sepay_test'){const receipt=events.find(e=>e.eventType==='sepay.receipt'&&e.provider===p.provider),api=events.find(e=>e.eventType==='sepay.api_receipt'&&e.provider===p.provider);if(!receipt||!api||receipt.payload.bankReference!==p.providerReference||receipt.payload.amountVnd!==p.amountVnd.toString()||api.payload.bankKey!==receipt.providerEventId||api.providerEventId!=='api:'+receipt.payload.apiId||typeof receipt.payload.receivedAt!=='string'||Date.parse(receipt.payload.receivedAt)!==p.paidAt?.getTime())review(f,'SEPAY_RECEIPT_LINK','Bằng chứng ngân hàng và API không khớp số tiền, tham chiếu hoặc thời điểm nhận.');for(const kind of ['sepay.receipt','sepay.api_receipt'])if(events.filter(e=>e.provider===p.provider&&e.eventType===kind&&e.signatureValid&&e.processingStatus==='processed').length!==1)review(f,'SEPAY_RECEIPT','Thiếu bằng chứng SePay Test được xác thực và đối chiếu API.');}
  else review(f,'PAYMENT_PROVIDER','Nhà cung cấp lịch sử chưa có quy tắc chứng minh được duyệt.');
  const [undo]=await tx.select({id:lt.id}).from(lt).where(and(eq(lt.reversalOfTransactionId,l.id),ne(lt.status,'failed'))).limit(1);if(undo)review(f,'TOPUP_REVERSED','Bút toán nạp đã có đảo nhưng đơn còn báo thanh toán thành công.');

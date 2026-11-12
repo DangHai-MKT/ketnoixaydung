@@ -21,7 +21,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
   return <main className="fw-page">
     <IdentityHeader rootHref="/admin/payments" rootLabel="Đơn nạp" title="Đối soát SePay Live"
       description="Kiểm tra webhook, giao dịch ngân hàng và đơn nạp tương ứng." />
-    <p className="fw-info">Đã khớp đơn chỉ xác nhận bằng chứng chuyển khoản. Admin vẫn xác nhận cộng POINT theo quy trình nạp thủ công.</p>
+    <p className="fw-info">Đã khớp đơn là kết quả đối soát. Xem kết quả cộng POINT ở từng giao dịch và trong chi tiết đơn.</p>
     {actor.roles.includes('super_admin') && <div className="fw-actions"><a href="/admin/settings#sepay-live">Cấu hình SePay Live</a></div>}
     <DashboardPanel title="Webhook giao dịch" icon="file">
       <div className="fw-orders">
@@ -30,6 +30,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ p
           <span className="fw-reference">{row.reference ?? 'Không có mã đơn phù hợp'}</span>
           <span>Giao dịch {row.bankReference} · tài khoản …{row.accountLast4}</span>
           <WalletTime date={row.receivedAt} />
+          {row.creditOutcome === 'credited' && <strong>Đã tự động cộng POINT</strong>}
+          {row.creditOutcome === 'already_paid' && <span>Đơn đã được cộng POINT trước đó</span>}
           {row.error && <p>{row.error}</p>}
           {row.orderId && <a href={`/admin/payments/${row.orderId}`}>Xem đơn nạp →</a>}
           {['failed', 'received'].includes(row.status) && <SepayRetry id={row.id} mode="live" />}

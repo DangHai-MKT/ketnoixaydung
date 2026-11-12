@@ -2,6 +2,14 @@ import {createHash,createHmac,timingSafeEqual} from 'node:crypto';
 import {AccessError} from '../auth/permissions';
 
 export const sepayProvider='sepay_test';
+export const sepayLiveProvider = 'sepay_live';
+export const sepayLiveWebhookEvent = 'sepay.live.webhook';
+export function sepayAutoCreditStart(value: string | undefined) {
+ if (!value || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value)) return null;
+ const start = new Date(value);
+ if (!Number.isFinite(start.getTime()) || start.toISOString() !== value.replace(/(?<!\.\d{3})Z$/, '.000Z')) return null;
+ return start;
+}
 export function verifySepaySignature(body:Uint8Array,headers:Headers,secret:string,now=Date.now()){
  const timestamp=headers.get('x-sepay-timestamp')||'',signature=headers.get('x-sepay-signature')||'';
  if(!secret||!/^\d{10}$/.test(timestamp)||Math.abs(now/1000-Number(timestamp))>300||!/^sha256=[a-f0-9]{64}$/i.test(signature))throw new AccessError(401,'Chữ ký webhook không hợp lệ hoặc đã hết hạn.');
