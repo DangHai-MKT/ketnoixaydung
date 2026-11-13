@@ -832,6 +832,17 @@ export const auditLogs = pgTable('audit_logs', {
   }).onDelete('set null'),
 ]);
 
+export const purchaseMessages = pgTable('purchase_messages', {
+  id: uuid('id').primaryKey(),
+  purchaseId: uuid('purchase_id').notNull().references(() => purchaseOrders.id, { onDelete: 'restrict' }),
+  senderId: uuid('sender_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  body: text('body').notNull(),
+  createdAt: now(),
+}, t => [
+  check('purchase_messages_body_length', sql`char_length(btrim(${t.body})) BETWEEN 1 AND 2000`),
+  index('purchase_messages_thread_idx').on(t.purchaseId, t.createdAt.desc(), t.id.desc()),
+]);
+
 export const notifications = pgTable('notifications', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').notNull(),

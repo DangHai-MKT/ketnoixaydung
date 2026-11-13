@@ -8,6 +8,8 @@ import { requirePageActor } from '../../../../../../lib/auth/server';
 import { purchasedProjectPath } from '../../../../../../lib/projects/purchased-path';
 import { privateLabels } from '../../../../../../lib/projects/workflow';
 import { getOwnPurchasedProject } from '../../../../../../services/purchase-access';
+import { chatPath } from '../../../../../../lib/projects/purchase-chat';
+import ProjectContactActions from '../../../../../../components/ProjectContactActions';
 
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
@@ -49,7 +51,13 @@ export default async function PurchasedProjectPage({ params }: { params: Promise
         {fields.length ? <dl className="pd-facts">{fields.map(({ key, label, value }) =>
           <div key={key}><dt>{label}</dt><dd className="pd-description">{value}</dd></div>
         )}</dl> : <p>Phiên bản này chưa có thông tin bổ sung.</p>}
-        <ProjectParticipantCards participants={receipt.participants}/>
+        <section className="purchase-access-next">
+          <h3>Bắt đầu tiếp cận dự án</h3>
+          <p>Xem vai trò của từng đơn vị trong hồ sơ. Nếu chưa rõ nên liên hệ ai trước hoặc cần hỏi cách gửi báo giá, hãy trao đổi với người bán.</p>
+          <div className="fw-actions"><a className="dash-primary" href={chatPath('buyer', receipt.id)}>Trao đổi với người bán</a></div>
+          <ProjectContactActions phone={receipt.privateData.contactPhone} email={receipt.privateData.contactEmail} />
+          <ProjectParticipantCards participants={receipt.participants} showContactActions />
+        </section>
         <h3>Tài liệu được cấp quyền</h3>
         {receipt.files.length ? <ul>{receipt.files.map(file => <li key={file.id}><a href={file.url}>{file.label}</a></li>)}</ul>
           : <p>Phiên bản này không có tệp đính kèm.</p>}

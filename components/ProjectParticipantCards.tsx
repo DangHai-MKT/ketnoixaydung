@@ -1,6 +1,9 @@
 import { participantRoles, participantStatuses, type ProjectParticipant } from '../lib/projects/participants';
+import ProjectContactActions from './ProjectContactActions';
 
-export default function ProjectParticipantCards({ participants }: { participants: ProjectParticipant[] }) {
+export default function ProjectParticipantCards({ participants, showContactActions = false }: {
+  participants: ProjectParticipant[]; showContactActions?: boolean;
+}) {
   if (!participants.length) return null;
   return <section className="project-participants">
     <h3>Các bên tham gia dự án</h3>
@@ -18,6 +21,7 @@ export default function ProjectParticipantCards({ participants }: { participants
           {row.phone && <div><dt>Điện thoại liên hệ</dt><dd>{row.phone}</dd></div>}
           {row.email && <div><dt>Email liên hệ</dt><dd>{row.email}</dd></div>}
         </dl>
+        {showContactActions && <ProjectContactActions phone={row.phone} email={row.email} />}
       </article>)}
     </div>
   </section>;

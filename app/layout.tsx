@@ -11,6 +11,7 @@ import './seller-dashboard.css';
 import './buyer-dashboard.css';
 import './identity.css';
 import './project-marketplace.css';
+import './purchase-chat.css';
 import './auth-experience.css';
 import './finance.css';
 import './editorial.css';
