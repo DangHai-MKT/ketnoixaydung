@@ -1,10 +1,11 @@
 'use client';
 import { useState } from 'react';
 import { authClient } from '../lib/auth/client';
-export default function EmailVerificationForm({ email }: {
+export default function EmailVerificationForm({ email, callbackURL = '/verify-email' }: {
     email: string;
+    callbackURL?: string;
 }) { const [pending, setPending] = useState(false), [message, setMessage] = useState(''), [error, setError] = useState(false); return <div><button className="button button-primary" disabled={pending} onClick={async () => { setPending(true); setMessage(''); try {
-    const result = await authClient.sendVerificationEmail({ email, callbackURL: '/verify-email' });
+    const result = await authClient.sendVerificationEmail({ email, callbackURL });
     if (result.error)
         throw new Error();
     setError(false);

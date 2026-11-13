@@ -32,6 +32,8 @@ export async function sendIdentityEmail(to: string, url: string, kind: 'reset' |
     const delivery = await getEmailDelivery();
     if (!delivery) throw new Error('Dịch vụ email chưa được cấu hình.');
     const response = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: `Bearer ${delivery.apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: delivery.from, to: [to], subject: kind === 'reset' ? `Đặt lại mật khẩu ${siteIdentity.name}` : `Xác minh email ${siteIdentity.name}`, text: `${kind === 'reset' ? 'Bạn đã yêu cầu đặt lại mật khẩu. Liên kết có hiệu lực 15 phút.' : 'Xác minh địa chỉ email của bạn.'}\n\n${url}\n\nNếu không phải bạn yêu cầu, hãy bỏ qua email này.` }), signal: AbortSignal.timeout(10000) });
-    if (!response.ok)
+    if (!response.ok) {
+        console.warn('Resend từ chối gửi email tài khoản.', { status: response.status, kind });
         throw new Error('Không thể gửi email lúc này.');
+    }
 }
