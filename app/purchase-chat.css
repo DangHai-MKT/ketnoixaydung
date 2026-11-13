@@ -44,6 +44,40 @@
 .purchase-chat-form [role="alert"] { color: #9c2020; margin: 0; }
 .purchase-chat-form summary { cursor: pointer; }
 
+.floating-chat-launcher {
+  position: fixed;
+  right: 18px;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 119;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 15px;
+  min-height: 44px;
+  border: 1px solid #d0dfef;
+  border-radius: 10px;
+  background: #fff;
+  color: #174d91;
+  box-shadow: 0 4px 18px #14305033;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.floating-chat-launcher:hover { background: #edf5ff; }
+.floating-chat-unread {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  min-height: 20px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #be2335;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.floating-chat-list button > span:nth-child(2) { min-width: 0; flex: 1; }
 .floating-purchase-chat {
   position: fixed;
   inset: auto 18px 12px auto;

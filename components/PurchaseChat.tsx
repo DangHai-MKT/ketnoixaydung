@@ -11,6 +11,7 @@ import { readPurchaseChat } from '../services/purchase-chat';
 import { DashboardPanel } from './DashboardPanels';
 import { IdentityHeader } from './PhaseOneUI';
 import PurchaseChatForm from './PurchaseChatForm';
+import PurchaseChatReadReceipt from './PurchaseChatReadReceipt';
 
 export default async function PurchaseChat({ id, side, page }: { id: string; side: ChatSide; page?: string | string[] }) {
   const buyer = side === 'buyer';
@@ -29,6 +30,7 @@ export default async function PurchaseChat({ id, side, page }: { id: string; sid
   </main>;
   const { order, messages, hasOlder } = thread;
   return <main className="fw-page purchase-chat">
+    <PurchaseChatReadReceipt side={side} id={id} messages={messages.filter(message => message.senderId !== actor.id).map(message => message.id)} />
     <IdentityHeader rootHref={buyer ? '/account/purchases' : '/seller/transactions'}
       rootLabel={buyer ? 'Dự án đã mua' : 'Lịch sử bán'} title={buyer ? 'Trao đổi với người bán' : 'Trao đổi với người mua'}
       description={`${order.title} · Phiên bản ${order.version}`} />

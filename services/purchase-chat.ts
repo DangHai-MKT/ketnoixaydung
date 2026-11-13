@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, desc, eq, isNotNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, ne, sql } from 'drizzle-orm';
 import { db } from '../db/client';
 import { notifications, projectVersions, purchaseMessages, purchaseOrders } from '../db/schema';
 import { AccessError, requireRoles, type Actor } from '../lib/auth/permissions';
@@ -7,16 +7,45 @@ import { chatMessageLimit, chatPath, type ChatSide } from '../lib/projects/purch
 import { uuidInput } from '../lib/seller/validation';
 
 const pageSize = 30;
+const messageNotification = 'purchase.message.received';
+const notificationLink = sql<string>`${notifications.data}->>'href'`;
 const ownership = (actor: Actor, side: ChatSide, id: string) =>
   and(eq(purchaseOrders.id, uuidInput(id)),
     eq(side === 'buyer' ? purchaseOrders.buyerId : purchaseOrders.sellerId, requireRoles(actor, [side]).id));
 
-export function listPurchaseChats(actor: Actor, side: ChatSide) {
+export async function getPurchaseChatUnread(actor: Actor, side: ChatSide) {
+  const owner = requireRoles(actor, [side]).id;
+  const pattern = chatPath(side, '%');
+  const rows = await db.select({ href: notificationLink, count: sql<number>`count(*)::int` })
+    .from(notifications).where(and(eq(notifications.userId, owner), eq(notifications.type, messageNotification),
+      isNull(notifications.readAt), sql`${notificationLink} LIKE ${pattern}`))
+    .groupBy(notificationLink);
+  return Object.fromEntries(rows.map(row => [row.href, row.count]));
+}
+
+export async function markPurchaseChatRead(actor: Actor, side: ChatSide, id: string, messageIds: string[]) {
+  if (!Array.isArray(messageIds) || messageIds.length > pageSize) throw new AccessError(400, 'Danh sách tin nhắn không hợp lệ.');
+  if (!messageIds.length) return false;
+  const [order] = await db.select({ id: purchaseOrders.id }).from(purchaseOrders).where(ownership(actor, side, id));
+  if (!order) throw new AccessError(404, 'Không tìm thấy cuộc trao đổi.');
+  const result = await db.update(notifications).set({ readAt: new Date() }).where(and(
+    eq(notifications.userId, actor.id), eq(notifications.type, messageNotification), isNull(notifications.readAt),
+    eq(notificationLink, chatPath(side, order.id)),
+    sql`EXISTS (SELECT 1 FROM ${purchaseMessages} WHERE ${purchaseMessages.purchaseId} = ${order.id}
+      AND ${inArray(purchaseMessages.id, messageIds.map(uuidInput))} AND ${ne(purchaseMessages.senderId, actor.id)}
+      AND (${notifications.data}->>'messageId' = ${purchaseMessages.id}::text
+        OR (${notifications.data}->>'messageId' IS NULL AND ${notifications.createdAt} = ${purchaseMessages.createdAt})))`,
+  ));
+  return (result.rowCount ?? 0) > 0;
+}
+
+export function listPurchaseChats(actor: Actor, side: ChatSide, unreadIds: string[] = []) {
   const owner = requireRoles(actor, [side]).id;
   return db.select({ id: purchaseOrders.id, title: projectVersions.title, version: projectVersions.versionNo })
     .from(purchaseOrders).innerJoin(projectVersions, eq(projectVersions.id, purchaseOrders.projectVersionId))
     .where(and(eq(side === 'buyer' ? purchaseOrders.buyerId : purchaseOrders.sellerId, owner), isNotNull(purchaseOrders.completedAt)))
-    .orderBy(desc(purchaseOrders.completedAt), desc(purchaseOrders.id)).limit(20);
+    .orderBy(...(unreadIds.length ? [desc(inArray(purchaseOrders.id, unreadIds))] : []),
+      desc(purchaseOrders.completedAt), desc(purchaseOrders.id)).limit(20);
 }
 
 export async function readPurchaseChat(actor: Actor, side: ChatSide, id: string, page: number) {
@@ -52,10 +81,10 @@ export async function sendPurchaseMessage(actor: Actor, side: ChatSide, id: stri
     const recipient = side === 'buyer' ? 'seller' : 'buyer';
     await tx.insert(notifications).values({
       userId: recipient === 'seller' ? order.sellerId : order.buyerId,
-      type: 'purchase.message.received',
+      type: messageNotification,
       title: 'Có tin nhắn mới về dự án',
       body: 'Mở cuộc trao đổi để xem và trả lời tin nhắn.',
-      data: { href: chatPath(recipient, order.id) },
+      data: { href: chatPath(recipient, order.id), messageId: key },
     });
   });
 }
