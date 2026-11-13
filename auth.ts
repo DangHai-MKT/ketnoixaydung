@@ -40,7 +40,16 @@ export const auth = betterAuth({
     onPasswordReset: async ({user}) => { await db.insert(schema.auditLogs).values({actorId:user.id,entityType:'user',entityId:user.id,action:'user.password.reset'}); },
   },
   emailVerification: {
-    sendVerificationEmail: async ({user,url}) => { await sendIdentityEmail(user.email,url,'verify'); },
+    sendOnSignUp: true,
+    sendVerificationEmail: async ({user,url}, request) => {
+      try {
+        await sendIdentityEmail(user.email,url,'verify');
+      } catch (error) {
+        // Verification is optional at signup. Keep the account usable and allow retry.
+        if (!request || !new URL(request.url).pathname.endsWith('/sign-up/email')) throw error;
+        console.error('Không gửi được email xác thực khi đăng ký. Kiểm tra cấu hình và nhật ký Resend.');
+      }
+    },
     expiresIn: 900,
   },
   rateLimit: {

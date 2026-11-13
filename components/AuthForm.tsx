@@ -25,7 +25,7 @@ export default function AuthForm({ mode }: { mode: 'login' | 'register' }) {
     if (registering && password !== data.get('confirmPassword')) { setError('Mật khẩu xác nhận chưa khớp.'); return; }
     setPending(true); setError('');
     try {
-      const result = registering ? await authClient.signUp.email({ email, password, name: name! }) : await authClient.signIn.email({ email, password });
+      const result = registering ? await authClient.signUp.email({ email, password, name: name!, callbackURL: '/verify-email' }) : await authClient.signIn.email({ email, password });
       if (result.error) {
         setError(result.error.status === 429 ? 'Bạn thao tác quá nhanh. Vui lòng thử lại sau.' : registering ? 'Không thể đăng ký. Vui lòng kiểm tra thông tin hoặc đăng nhập nếu đã có tài khoản.' : 'Không thể đăng nhập. Vui lòng kiểm tra thông tin và trạng thái tài khoản.');
         setPending(false); return;

@@ -17,7 +17,11 @@ function testMailbox() {
     }
     return resolve('tmp', 'identity-test-mail', process.env.CONSTRUCTION_AUTH_TEST_RUN_ID);
 }
-export function emailConfigured() { return Boolean(testMailbox() || (process.env.RESEND_API_KEY && process.env.AUTH_EMAIL_FROM)); }
+export async function emailConfigured() {
+    if (testMailbox()) return true;
+    try { return Boolean(await getEmailDelivery()); }
+    catch { return false; }
+}
 export async function sendIdentityEmail(to: string, url: string, kind: 'reset' | 'verify') {
     const mailbox = testMailbox();
     if (mailbox) {
