@@ -29,5 +29,9 @@ export default async function nextConfig(phase) {
       throw error;
     }
   }
+  if (phase === nextConstants.PHASE_PRODUCTION_SERVER && !isolatedAuthTest && process.env.PURCHASE_CHAT_SQL_0013 === '1') {
+    const { runPurchaseChatMigration } = await import('./scripts/apply-purchase-chat-0013.mjs');
+    await runPurchaseChatMigration();
+  }
   return config;
 }
