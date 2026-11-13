@@ -9,6 +9,21 @@ import { getOwnWallet } from './dashboard';
 import { getPublicProject } from './public-projects';
 import { publicProject } from '../lib/projects/contracts';
 import { readProjectParticipants } from '../lib/projects/participants';
+import { getCurrentActor } from '../lib/auth/server';
+import type { PublicProject } from '../lib/projects/contracts';
+
+export async function markPurchasedProjects(projects: PublicProject[], requestHeaders?: Headers) {
+  if (!projects.length) return projects;
+  const actor = await getCurrentActor(requestHeaders);
+  if (actor?.status !== 'active' || !actor.roles.includes('buyer')) return projects;
+
+  const orders = await db.selectDistinct({ projectId: purchaseOrders.projectId })
+    .from(purchaseOrders)
+    .where(and(eq(purchaseOrders.buyerId, actor.id), eq(purchaseOrders.status, 'completed'),
+      inArray(purchaseOrders.projectId, projects.map(project => project.id))));
+  const purchasedIds = new Set(orders.map(order => order.projectId));
+  return projects.map(project => ({ ...project, purchased: purchasedIds.has(project.id) }));
+}
 
 async function activeBuyer(actor: Actor) {
   const [user]=await db.select().from(users).where(eq(users.id,actor.id));

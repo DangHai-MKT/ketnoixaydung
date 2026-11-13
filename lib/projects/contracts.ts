@@ -17,6 +17,7 @@ export function publicProject(row: { id: string; slug: string; publishedAt: Date
     publicData, sellerLabel: 'Nhà cung cấp đã xác minh' };
 }
 export type PublicProject = ReturnType<typeof publicProject> & {
+  purchased?: boolean;
   imageUrl?: string | null;
   files?: { id: string; url: string; label: string }[];
   packageContents?: { organizations: boolean; contacts: boolean; exactLocation: boolean; notes: boolean; documents: number };

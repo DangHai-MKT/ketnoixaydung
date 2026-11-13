@@ -1,4 +1,5 @@
 import { getPublicMarketplaceSummary, listLatestPublicProjects } from '../services/public-projects';
+import { markPurchasedProjects } from '../services/purchase-access';
 import {listPublishedNews} from '../services/cms';
 import { categoryLabels } from '../lib/projects/workflow';
 import { provinceOptions } from '../lib/projects/locations';
@@ -18,7 +19,10 @@ const guides = [
 
 export default async function MarketplaceHome() {
   const [listing,stats,news]=await Promise.allSettled([
-    listLatestPublicProjects(5),
+    listLatestPublicProjects(5).then(async projects => {
+      try { return await markPurchasedProjects(projects); }
+      catch { return projects; }
+    }),
     getPublicMarketplaceSummary(),
     listPublishedNews('','',1,4),
   ]);
