@@ -8,7 +8,7 @@ import { requirePageActor } from '../../../../../../lib/auth/server';
 import { purchasedProjectPath } from '../../../../../../lib/projects/purchased-path';
 import { privateLabels } from '../../../../../../lib/projects/workflow';
 import { getOwnPurchasedProject } from '../../../../../../services/purchase-access';
-import { chatPath } from '../../../../../../lib/projects/purchase-chat';
+import FloatingPurchaseChat from '../../../../../../components/FloatingPurchaseChat';
 import ProjectContactActions from '../../../../../../components/ProjectContactActions';
 
 export const dynamic = 'force-dynamic';
@@ -54,7 +54,7 @@ export default async function PurchasedProjectPage({ params }: { params: Promise
         <section className="purchase-access-next">
           <h3>Bắt đầu tiếp cận dự án</h3>
           <p>Xem vai trò của từng đơn vị trong hồ sơ. Nếu chưa rõ nên liên hệ ai trước hoặc cần hỏi cách gửi báo giá, hãy trao đổi với người bán.</p>
-          <div className="fw-actions"><a className="dash-primary" href={chatPath('buyer', receipt.id)}>Trao đổi với người bán</a></div>
+          <div className="fw-actions"><FloatingPurchaseChat purchaseId={receipt.id} /></div>
           <ProjectContactActions phone={receipt.privateData.contactPhone} email={receipt.privateData.contactEmail} />
           <ProjectParticipantCards participants={receipt.participants} showContactActions />
         </section>

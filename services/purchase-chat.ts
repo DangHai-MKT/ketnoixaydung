@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNotNull } from 'drizzle-orm';
 import { db } from '../db/client';
 import { notifications, projectVersions, purchaseMessages, purchaseOrders } from '../db/schema';
 import { AccessError, requireRoles, type Actor } from '../lib/auth/permissions';
@@ -10,6 +10,14 @@ const pageSize = 30;
 const ownership = (actor: Actor, side: ChatSide, id: string) =>
   and(eq(purchaseOrders.id, uuidInput(id)),
     eq(side === 'buyer' ? purchaseOrders.buyerId : purchaseOrders.sellerId, requireRoles(actor, [side]).id));
+
+export function listPurchaseChats(actor: Actor, side: ChatSide) {
+  const owner = requireRoles(actor, [side]).id;
+  return db.select({ id: purchaseOrders.id, title: projectVersions.title, version: projectVersions.versionNo })
+    .from(purchaseOrders).innerJoin(projectVersions, eq(projectVersions.id, purchaseOrders.projectVersionId))
+    .where(and(eq(side === 'buyer' ? purchaseOrders.buyerId : purchaseOrders.sellerId, owner), isNotNull(purchaseOrders.completedAt)))
+    .orderBy(desc(purchaseOrders.completedAt), desc(purchaseOrders.id)).limit(20);
+}
 
 export async function readPurchaseChat(actor: Actor, side: ChatSide, id: string, page: number) {
   return db.transaction(async tx => {
