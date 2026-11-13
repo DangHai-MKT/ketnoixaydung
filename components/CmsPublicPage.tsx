@@ -1,7 +1,7 @@
 import {cache} from 'react';
 import {notFound} from 'next/navigation';
 import {cmsPublicPath,type CmsKind} from '../lib/cms/content';
-import {breadcrumbJson,publicMetadata,publicOrigin} from '../lib/site/seo';
+import {breadcrumbJson,publicMetadata,publicOrigin,structuredData} from '../lib/site/seo';
 import {getPublishedContent} from '../services/cms';
 import CmsContent from './CmsContent';
 
@@ -23,12 +23,13 @@ export default async function CmsPublicPage({kind,slug}:{kind:CmsKind;slug:strin
   const crumbs=[{label:'Trang chủ',path:'/'},...(kind==='news'?[{label:'Tin tức',path:'/news'}]:[]),{label:row.content.title,path:cmsPublicPath(kind,slug)}];
   const json=breadcrumbJson(crumbs);
   const origin=publicOrigin();
-  const article=kind==='news'&&origin?JSON.stringify({
+  const article=kind==='news'&&origin?structuredData({
     '@context':'https://schema.org','@type':'Article',
     mainEntityOfPage:origin+cmsPublicPath(kind,slug), headline:row.content.title,
-    description:row.content.summary, dateModified:row.publishedAt.toISOString(),
+    description:row.content.summary, inLanguage:'vi-VN',
+    publisher:{'@id':origin+'/#organization'}, dateModified:row.publishedAt.toISOString(),
     image:row.content.featuredMediaId?origin+'/api/cms/media/'+row.content.featuredMediaId:undefined,
-  }).replaceAll('<','\\u003c'):null;
+  }):null;
   return <main className={'editorial-page cms-public'+(kind==='news'?' news-detail':' info-detail')}>
     {json&&<script type="application/ld+json" dangerouslySetInnerHTML={{__html:json}}/>}
     {article&&<script type="application/ld+json" dangerouslySetInnerHTML={{__html:article}}/>}

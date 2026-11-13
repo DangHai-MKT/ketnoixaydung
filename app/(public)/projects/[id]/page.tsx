@@ -5,6 +5,7 @@ import {getPublicProject,listPublicProjects} from '../../../../services/public-p
 import PublicProjectDetail from '../../../../components/PublicProjectDetail';
 import ProjectCard from '../../../../components/ProjectCard';
 import PurchasePanel from '../../../../components/PurchasePanel';
+import {categoryLabels} from '../../../../lib/projects/workflow';
 export const dynamic='force-dynamic';
 const getProject = cache(async (id: string) => {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) notFound();
@@ -15,9 +16,11 @@ const getProject = cache(async (id: string) => {
 
 export async function generateMetadata({params}: {params: Promise<{id: string}>}) {
   const project = await getProject((await params).id);
-  const description = project.publicSummary.replace(/\s+/g, ' ').trim();
+  const category = Object.hasOwn(categoryLabels, project.category) ? categoryLabels[project.category] : null;
+  const facts = [category, project.provinceCode, project.projectStage].filter(Boolean).join(' · ');
+  const description = project.publicSummary.trim() || [project.title, facts].filter(Boolean).join(' — ');
   return publicMetadata('/projects/' + project.id, project.title,
-    description.length > 160 ? description.slice(0, 159).trimEnd() + '…' : description,
+    description,
     project.imageUrl ?? undefined);
 }
 export default async function ProjectPage({params}:{params:Promise<{id:string}>}){
