@@ -3,12 +3,24 @@ import {and,asc,eq,inArray,ne,sql} from 'drizzle-orm';
 import {db} from '../db/client';
 import {ledgerEntries,ledgerTransactions,purchaseOrders,refunds,sellerEarnings,users,userRoles,wallets} from '../db/schema';
 import {AccessError,isRole,requireRoles,type Actor} from '../lib/auth/permissions';
+import {secretStorageReady} from '../lib/settings/secrets';
 import {isTopupTestEnvironment} from './payments';
 export type SettlementTx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 export type Purchase=typeof purchaseOrders.$inferSelect;
 export type Earning=typeof sellerEarnings.$inferSelect;
 export function requireSettlementTest(){if(!isTopupTestEnvironment())throw new AccessError(503,'Thao tác tài chính này chỉ mở trên cơ sở dữ liệu kiểm thử cô lập đã được duyệt.');}
-export async function settlementTransaction<T>(work:(tx:SettlementTx)=>Promise<T>):Promise<T>{requireSettlementTest();try{return await db.transaction(async tx=>{await tx.execute(sql`SET LOCAL lock_timeout='5s'`);await tx.execute(sql`SET LOCAL statement_timeout='15s'`);return work(tx);},{isolationLevel:'read committed'});}catch(error){let cause:unknown=error;for(let n=0;n<5&&cause&&typeof cause==='object';n++){const e=cause as {code?:string;cause?:unknown};if(e.code==='23505')throw new AccessError(409,'Yêu cầu hoặc bút toán đã tồn tại. Tải lại để đối chiếu, không ghi tiền lần nữa.');if(['55P03','57014','40P01','40001'].includes(e.code||''))throw new AccessError(503,'Giao dịch đang được xử lý. Tải lại và thử với cùng mã yêu cầu.');cause=e.cause;}throw error;}}
+export function payoutOperationsEnabled() {
+ return isTopupTestEnvironment() || (process.env.NODE_ENV==='production' &&
+  process.env.CONSTRUCTION_AUTH_TEST!=='1' && process.env.SELLER_PAYOUT_LIVE_ENABLED==='1' &&
+  Boolean(process.env.PAYOUT_PRIVATE_STORAGE_DIR?.trim()) && secretStorageReady());
+}
+export function requirePayoutOperations() {
+ if(!payoutOperationsEnabled())throw new AccessError(503,'Chức năng rút tiền chưa sẵn sàng.');
+}
+export function payoutTransaction<T>(work:(tx:SettlementTx)=>Promise<T>){
+ return settlementTransaction(work,requirePayoutOperations);
+}
+export async function settlementTransaction<T>(work:(tx:SettlementTx)=>Promise<T>,requireOperations=requireSettlementTest):Promise<T>{requireOperations();try{return await db.transaction(async tx=>{await tx.execute(sql`SET LOCAL lock_timeout='5s'`);await tx.execute(sql`SET LOCAL statement_timeout='15s'`);return work(tx);},{isolationLevel:'read committed'});}catch(error){let cause:unknown=error;for(let n=0;n<5&&cause&&typeof cause==='object';n++){const e=cause as {code?:string;cause?:unknown};if(e.code==='23505')throw new AccessError(409,'Yêu cầu hoặc bút toán đã tồn tại. Tải lại để đối chiếu, không ghi tiền lần nữa.');if(['55P03','57014','40P01','40001'].includes(e.code||''))throw new AccessError(503,'Giao dịch đang được xử lý. Tải lại và thử với cùng mã yêu cầu.');cause=e.cause;}throw error;}}
 export async function settlementActor(tx:SettlementTx,actor:Actor,roles:readonly ('buyer'|'finance_operator'|'super_admin')[]){const [u]=await tx.select().from(users).where(eq(users.id,actor.id));const grants=await tx.select().from(userRoles).where(eq(userRoles.userId,actor.id));return requireRoles(u?{...u,roles:grants.map(g=>g.role).filter(isRole)}:null,roles);}
 export async function lockSettlementPurchase(tx:SettlementTx,actor:Actor,id:string,finance:boolean){
  const [identity]=await tx.select().from(purchaseOrders).where(eq(purchaseOrders.id,id));if(!identity||!finance&&identity.buyerId!==actor.id)throw new AccessError(404,'Không tìm thấy giao dịch mua.');
