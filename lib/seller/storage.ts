@@ -69,15 +69,15 @@ async function storageRoot(namespace: 'seller' | 'project' | 'dispute' | 'payout
 export function validStorageKey(key: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.png$/.test(key);
 }
-export async function storeImage(bytes: Buffer, namespace: 'seller' | 'project' | 'dispute' | 'payout' = 'seller', projectDocument = false): Promise<string> {
+export async function storeImage(bytes: Buffer, namespace: 'seller' | 'project' | 'dispute' | 'payout' = 'seller', binaryDocument = false): Promise<string> {
   const root = await storageRoot(namespace);
-  const key = `${randomUUID()}.${namespace === 'project' && projectDocument ? 'blob' : 'png'}`;
+  const key = `${randomUUID()}.${(namespace === 'project' || namespace === 'seller') && binaryDocument ? 'blob' : 'png'}`;
   const file = await open(/* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ root, key), 'wx', 0o600);
   try { await file.writeFile(bytes); await file.sync(); } finally { await file.close(); }
   return key;
 }
 export async function readImage(key: string, namespace: 'seller' | 'project' | 'dispute' | 'payout' = 'seller'): Promise<Buffer> {
-  if (!validStorageKey(key) && !(namespace === 'project' && key.endsWith('.blob') && validStorageKey(key.slice(0, -5) + '.png'))) throw new AccessError(404, 'Không tìm thấy tài liệu.');
+  if (!validStorageKey(key) && !((namespace === 'project' || namespace === 'seller') && key.endsWith('.blob') && validStorageKey(key.slice(0, -5) + '.png'))) throw new AccessError(404, 'Không tìm thấy tài liệu.');
   const target = path.join(/* turbopackIgnore: true */ await storageRoot(namespace), key);
   try {
     const info = await lstat(/* turbopackIgnore: true */ target);
