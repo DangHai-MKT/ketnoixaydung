@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 import {readImage} from '../lib/seller/storage';
 import {and,desc,eq,inArray,sql} from 'drizzle-orm';
 import {db} from '../db/client';
-import {payoutAccounts,payoutDocuments,payoutEvents,users} from '../db/schema';
+import {notifications,payoutAccounts,payoutDocuments,payoutEvents,users} from '../db/schema';
 import {AccessError,type Actor} from '../lib/auth/permissions';
 import {accountActionInput,createPayoutAccountInput,type payoutQuery} from '../lib/finance/payout';
 import {settlementId} from '../lib/finance/settlement';
@@ -18,6 +18,12 @@ export async function actPayoutAccount(actor:Actor,id:string,admin:boolean,input
  if(d.action==='reject'){if(account.status!=='pending')throw new AccessError(409,'Chỉ từ chối tài khoản đang chờ.');await tx.update(payoutAccounts).set({status:'rejected',reviewReason:d.reason,revision:account.revision+1,updatedAt:new Date()}).where(eq(payoutAccounts.id,id));}
  if(d.action==='default'){await sellerPayoutEligible(tx,account.userId);if(account.status!=='verified'||!account.verifiedBy||!account.verifiedAt)throw new AccessError(409,'Chỉ tài khoản đã được xác minh mới làm mặc định.');decryptPayoutNumber(account.accountNumberEncrypted,id,account.userId);await tx.update(payoutAccounts).set({isDefault:false,revision:sql`${payoutAccounts.revision}+1`,updatedAt:new Date()}).where(and(eq(payoutAccounts.userId,account.userId),eq(payoutAccounts.isDefault,true)));await tx.update(payoutAccounts).set({isDefault:true,revision:sql`${payoutAccounts.revision}+1`,updatedAt:new Date()}).where(eq(payoutAccounts.id,id));}
  if(d.action==='disable'){if(account.status==='disabled')throw new AccessError(409,'Tài khoản đã được vô hiệu hóa.');await tx.update(payoutAccounts).set({status:'disabled',isDefault:false,reviewReason:d.reason,revision:account.revision+1,updatedAt:new Date()}).where(eq(payoutAccounts.id,id));}
+ if(d.action==='verify'||d.action==='reject') await tx.insert(notifications).values({
+  userId:account.userId,type:'payout.account.'+d.action,
+  title:d.action==='verify'?'Tài khoản nhận tiền đã được xác minh':'Tài khoản nhận tiền chưa được duyệt',
+  body:d.action==='verify'?'Bạn có thể chọn tài khoản này khi gửi yêu cầu rút.':'Mở hồ sơ để xem lý do và chuẩn bị thông tin cần bổ sung.',
+  data:{href:d.action==='verify'?'/seller/withdrawals/new':'/seller/payout-accounts/'+id},
+ });
  await payoutEvent(tx,actor,{accountId:id},kind,d.reason,d.key);await payoutAudit(tx,actor,'account.'+d.action,'payout_account',id,d.reason);return {ok:true,reused:false};});}
 export async function listPayoutAccounts(actor:Actor,admin:boolean,q:ReturnType<typeof payoutQuery>){return db.transaction(async tx=>{await payoutActor(tx,actor,admin);const where=and(admin?undefined:eq(payoutAccounts.userId,actor.id),q.status?eq(payoutAccounts.status,q.status):undefined);const rows=await tx.select({...projection,ownerName:users.displayName}).from(payoutAccounts).innerJoin(users,eq(users.id,payoutAccounts.userId)).where(where).orderBy(desc(payoutAccounts.createdAt),desc(payoutAccounts.id)).limit(20).offset((q.page-1)*20);const [count]=await tx.select({total:sql<number>`count(*)::int`}).from(payoutAccounts).where(where);return {rows,total:count.total,page:q.page};},{isolationLevel:'repeatable read',accessMode:'read only'});}
 export async function getPayoutAccount(actor:Actor,id:string,admin:boolean){settlementId(id);return db.transaction(async tx=>{const {account}=await accountForActor(tx,actor,id,admin);const [safe]=await tx.select(projection).from(payoutAccounts).where(eq(payoutAccounts.id,id));const documents=await tx.select({id:payoutDocuments.id,kind:payoutDocuments.kind,size:sql<string>`${payoutDocuments.sizeBytes}::text`,createdAt:payoutDocuments.createdAt}).from(payoutDocuments).where(eq(payoutDocuments.payoutAccountId,id)).orderBy(desc(payoutDocuments.createdAt));const history=await tx.select({id:payoutEvents.id,kind:payoutEvents.kind,message:payoutEvents.message,createdAt:payoutEvents.createdAt}).from(payoutEvents).where(eq(payoutEvents.payoutAccountId,id)).orderBy(desc(payoutEvents.createdAt)).limit(50);return {...safe,documents,history,canReview:admin&&actor.id!==account.userId,canManage:!admin};},{isolationLevel:'repeatable read',accessMode:'read only'});}

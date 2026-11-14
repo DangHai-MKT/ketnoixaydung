@@ -1,13 +1,21 @@
 import 'server-only';
-import {and,asc,desc,eq,gt,inArray,isNull,lte,or,sql} from 'drizzle-orm';
+import {and,asc,desc,eq,gt,inArray,isNull,lte,ne,or,sql} from 'drizzle-orm';
 import {db} from '../db/client';
-import {auditLogs,payoutAccounts,payoutEvents,sellerProfiles,systemSettings,userRoles,users} from '../db/schema';
+import {auditLogs,notifications,payoutAccounts,payoutEvents,sellerProfiles,systemSettings,userRoles,users} from '../db/schema';
 import {AccessError,isRole,requireRoles,type Actor} from '../lib/auth/permissions';
 import {approvedPayoutPolicy,payoutObject,payoutText} from '../lib/finance/payout';
 import {decryptSetting,encryptSetting,secretStorageReady} from '../lib/settings/secrets';
 import {type SettlementTx as Tx,requirePayoutOperations,payoutOperationsEnabled,payoutTransaction} from './settlement-core';
 export type PayoutTx=Tx;
 export const payoutFinanceRoles=['finance_operator','super_admin'] as const;
+export async function notifyPayoutAccountReviewers(tx:Tx, ownerId:string, accountId:string) {
+ const reviewers=await tx.selectDistinct({id:users.id}).from(users).innerJoin(userRoles,eq(userRoles.userId,users.id))
+  .where(and(eq(users.status,'active'),inArray(userRoles.role,payoutFinanceRoles),ne(users.id,ownerId)));
+ if(reviewers.length) await tx.insert(notifications).values(reviewers.map(({id})=>({
+  userId:id,type:'payout.account.review_requested',title:'Tài khoản nhận tiền chờ xác minh',
+  body:'Mở hồ sơ để đối chiếu ảnh xác nhận chủ tài khoản.',data:{href:'/admin/payout-accounts/'+accountId},
+ })));
+}
 export async function payoutActor(tx:Tx,actor:Actor,admin=false){const [u]=await tx.select().from(users).where(eq(users.id,actor.id)),grants=await tx.select().from(userRoles).where(eq(userRoles.userId,actor.id));return requireRoles(u?{...u,roles:grants.map(g=>g.role).filter(isRole)}:null,admin?payoutFinanceRoles:['seller']);}
 export async function sellerPayoutEligible(tx:Tx,id:string){const [u]=await tx.select().from(users).where(eq(users.id,id)),[role]=await tx.select().from(userRoles).where(and(eq(userRoles.userId,id),eq(userRoles.role,'seller'))),[profile]=await tx.select().from(sellerProfiles).where(eq(sellerProfiles.userId,id));if(u?.status!=='active'||!role||profile?.verificationStatus!=='verified')throw new AccessError(409,'Nhà cung cấp cần hoạt động và có hồ sơ đã xác minh để sử dụng chức năng này.');return profile;}
 export async function lockPayoutUsers(tx:Tx,ids:string[]){await tx.select({id:users.id}).from(users).where(inArray(users.id,[...new Set(ids)])).orderBy(asc(users.id)).for('update');}
