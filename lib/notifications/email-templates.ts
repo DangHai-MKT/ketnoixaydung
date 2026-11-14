@@ -1,6 +1,6 @@
 import { siteIdentity } from '../site/navigation';
 const sellerEvents=['seller.review.approve','seller.review.reject','seller.review.request_changes'] as const;
-const projectEvents=['project.review.approve','project.review.reject','project.review.request_changes'] as const;
+const projectEvents=['project.review.approve'] as const;
 export {sellerEvents,projectEvents};
 export type EmailGroup='seller'|'project';
 

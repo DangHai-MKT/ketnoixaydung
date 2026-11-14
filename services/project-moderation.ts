@@ -71,7 +71,7 @@ export async function moderateProject(actor: Actor, id: string, value: unknown) 
     const [updated] = await tx.update(projects).set(changes).where(eq(projects.id, id)).returning();
     await tx.insert(moderationReviews).values({ projectId: id, projectVersionId: version.id, reviewerId: actor.id, decision,
       reason: request.reason, automatedChecks: { passed: true, versionId: version.id } });
-    await projectEvent(tx, actor.id, updated, `project.review.${request.action}`, version.id, { overlapWarning }, true);
+    await projectEvent(tx, actor.id, updated, `project.review.${request.action}`, version.id, { overlapWarning }, request.action === 'approve');
     if (request.action === 'approve' && updated.status === 'published') {
       await projectEvent(tx, actor.id, updated, project.publishedAt ? 'project.revision_published' : 'project.published', version.id);
       if (!project.publishedAt) await notifyProjectWatch(tx,updated,version);

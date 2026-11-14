@@ -171,7 +171,7 @@ export async function submitProject(actor: Actor, id: string, expected: number, 
     if (errors.length) await tx.insert(moderationReviews).values({ projectId: id, projectVersionId: version.id, decision: 'changes_requested', automatedChecks: { passed: false, errors }, reason: 'Kiểm tra ban đầu chưa đạt.' });
     const [updated] = await tx.update(projects).set({ revision: project.revision + 1, updatedAt: new Date(),
       status: ['published', 'paused'].includes(project.status) ? project.status : state }).where(eq(projects.id, id)).returning();
-    await projectEvent(tx, actor.id, updated, 'project.submitted', version.id, { autoCheckPassed: errors.length === 0, overlapWarning }, true);
+    await projectEvent(tx, actor.id, updated, 'project.submitted', version.id, { autoCheckPassed: errors.length === 0, overlapWarning });
     if (state === 'pending_review') {
       const recipients = await tx.selectDistinct({ id: users.id }).from(users)
         .innerJoin(userRoles, eq(users.id, userRoles.userId))
@@ -252,7 +252,7 @@ export async function changeListingVisibility(actor: Actor, id: string, expected
     const [updated] = await tx.update(projects).set({ status: action === 'archive' ? 'archived' : action === 'republish' ? 'published' : 'paused', revision: project.revision + 1,
       archivedAt: action === 'archive' ? new Date() : null, updatedAt: new Date() }).where(eq(projects.id, id)).returning();
     const event = { archive: 'project.archived', withdraw: 'project.withdrawn', republish: 'project.republished' }[action];
-    await projectEvent(tx, actor.id, updated, event, version.id, {}, true);
+    await projectEvent(tx, actor.id, updated, event, version.id);
     return { id, revision: updated.revision };
   });
 }

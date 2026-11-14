@@ -48,6 +48,6 @@ export async function workingVersion(tx: SellerTx, project: ProjectRow): Promise
 export async function projectEvent(tx: SellerTx, actorId: string, project: ProjectRow, action: string, versionId: string, metadata: Record<string, unknown> = {}, notify = false) {
   await tx.insert(auditLogs).values({ actorId, entityType: 'project', entityId: project.id, action,
     metadata: { versionId, revision: project.revision, ...metadata } });
-  if (notify) await tx.insert(notifications).values({ userId: project.sellerId, type: action, title: 'Cập nhật tin dự án',
-    body: 'Tin dự án có kết quả xử lý mới. Mở khu vực dự án của bạn để xem chi tiết.', data: { projectId: project.id, href: `/seller/projects/${project.id}` } });
+  if (notify) await tx.insert(notifications).values({ userId: project.sellerId, type: action, title: 'Tin dự án đã được duyệt',
+    body: 'Mở dự án để xem phiên bản đã được duyệt.', data: { projectId: project.id, href: `/seller/projects/${project.id}` } });
 }
