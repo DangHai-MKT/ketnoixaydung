@@ -55,3 +55,7 @@
 .project-ward-popup button { display: block; width: 100%; padding: 9px; text-align: left; color: #183b63; background: #fff; border: 0; border-radius: 4px; cursor: pointer; }
 .project-ward-popup button:hover, .project-ward-popup button[aria-pressed="true"] { background: #e8f2ff; }
 .project-ward-popup p { margin: 8px 2px 2px; }
+.project-editor-progress { font-weight: 700; color: #174d91; margin-block: 16px 8px; }
+.project-editor-extra { margin-block: 16px; padding: 12px 14px; border: 1px solid #dce7f3; border-radius: 9px; }
+.project-editor-extra > summary { cursor: pointer; font-weight: 700; color: #174d91; }
+.project-editor-extra[open] > summary { margin-bottom: 14px; }

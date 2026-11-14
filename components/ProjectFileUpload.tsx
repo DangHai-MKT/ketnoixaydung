@@ -88,8 +88,8 @@ export default function ProjectFileUpload({ detail, disabled, onSaved, onBusy }:
   }
 
   return <section className="project-editor-section" aria-busy={Boolean(pending)}>
-    <h2>2. Ảnh và tệp</h2>
-    <p>Chọn một tệp để tải lên ngay. Mặc định tối đa 5 MB/tệp và 5 tệp mỗi phiên bản.</p>
+    <h2>Thêm ảnh hoặc tài liệu</h2>
+    <p>Có thể bỏ qua bước này nếu chưa có tệp. Tệp sẽ tự tải lên ngay khi bạn chọn.</p>
     <div className="project-form-grid">
       <div className="p2-quick-panel">
         <h3>Ảnh công khai</h3>
@@ -98,10 +98,10 @@ export default function ProjectFileUpload({ detail, disabled, onSaved, onBusy }:
         <button type="button" className="button button-primary" disabled={locked} onClick={()=>photoInput.current?.click()}>Thêm ảnh công khai</button>
       </div>
       <div className="p2-quick-panel">
-        <h3>Tệp bảo vệ</h3>
+        <h3>Tài liệu dành cho người mua</h3>
         <p>Ảnh, PDF hoặc Word. Người mua chỉ mở được tệp thuộc phiên bản đã mua.</p>
         <input ref={protectedInput} type="file" hidden accept={allFiles} disabled={locked} onChange={event=>selectFile(event,'purchased_only')}/>
-        <button type="button" className="button button-secondary" disabled={locked} onClick={()=>protectedInput.current?.click()}>Thêm tệp bảo vệ</button>
+        <button type="button" className="button button-secondary" disabled={locked} onClick={()=>protectedInput.current?.click()}>Chọn tài liệu</button>
       </div>
     </div>
     {disabled && <p>Lưu bản nháp trước khi tải tệp.</p>}

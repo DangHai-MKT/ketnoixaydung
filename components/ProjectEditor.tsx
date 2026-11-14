@@ -46,6 +46,10 @@ export default function ProjectEditor({id,mode='edit',versionId,initialStep=1}:{
  const canEdit=!versionId&&(!detail||(detail.project.status!=='archived'&&detail.version.submissionStatus==='draft'&&!detail.version.submittedAt&&!detail.version.approvedAt));
  const editing=mode==='edit'&&canEdit,disabled=pending||fileBusy;
  function updateFields(values:Partial<typeof empty>){setFields(current=>({...current,...values}));setDirty(true);}
+ function goToStep(next: number) {
+  setError('');
+  setStep(next);
+ }
  const {category,provinceCode,projectStage,constructionType,sizeMinSqm,sizeMaxSqm}=fields;
  const priceContext={category,provinceCode,projectStage,constructionType,sizeMinSqm,sizeMaxSqm};
  const choices:Partial<Record<keyof typeof empty,string[]>>={projectStage:stageOptions,constructionType:constructionOptions[category]};
@@ -53,9 +57,10 @@ export default function ProjectEditor({id,mode='edit',versionId,initialStep=1}:{
  const wardOptions = Object.hasOwn(wardsByProvince, currentProvince) ? wardsByProvince[currentProvince] : [];
  const publicData=Object.fromEntries(publicProjectDataKeys.map(key=>[key,key==='investmentAmount'?fields[key].replace(/\.$/,''):fields[key]]));
  const privacyIssues=projectPrivacyIssues({...fields,publicData},{...privateData,participants});
- const issues=[...privacyIssues,...templateIssues([fields.title,fields.publicSummary,fields.constructionType,fields.technicalSummary,fields.scopeSummary]),...(fields.title.trim().length<5?['Tên dự án cần tối thiểu 5 ký tự.']:[]),...(!fields.provinceCode?['Bổ sung tỉnh/thành.']:[]),...(!fields.projectStage?['Bổ sung giai đoạn.']:[]),...(!participants.length&&!Object.entries(privateData).some(([key,value])=>key!=='projectReference'&&key!=='packageScope'&&value.trim())?['Bổ sung thông tin bảo vệ có giá trị.']:[]),...(!rights||!fields.rightsDeclaration.trim()?['Xác nhận và khai báo quyền cung cấp thông tin.']:[]),...(!/^[1-9][0-9]{0,18}$/.test(fields.pricePoints)||BigInt(fields.pricePoints||'0')>9223372036854775807n?['Giá POINT phải là số nguyên dương hợp lệ.']:[])];
+ const issues=[...privacyIssues,...templateIssues([fields.title,fields.publicSummary,fields.constructionType,fields.technicalSummary,fields.scopeSummary]),...(fields.title.trim().length<5?['Tên dự án cần tối thiểu 5 ký tự.']:[]),...(!fields.provinceCode?['Bổ sung tỉnh/thành.']:[]),...(!fields.projectStage?['Bổ sung giai đoạn.']:[]),...(!participants.length&&!Object.entries(privateData).some(([key,value])=>key!=='projectReference'&&key!=='packageScope'&&value.trim())?['Bước 3: Thêm ít nhất một thông tin hữu ích, ví dụ chủ đầu tư, đầu mối liên hệ hoặc nhà thầu.']:[]),...(!rights||!fields.rightsDeclaration.trim()?['Xác nhận và khai báo quyền cung cấp thông tin.']:[]),...(!/^[1-9][0-9]{0,18}$/.test(fields.pricePoints)||BigInt(fields.pricePoints||'0')>9223372036854775807n?['Giá POINT phải là số nguyên dương hợp lệ.']:[])];
  async function save(event:React.FormEvent<HTMLFormElement>){
   event.preventDefault();if(disabled)return;const advance=((event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement|null)?.value==='continue';if(!id&&!fields.title.trim()){setStep(1);setError('Nhập tên dự án trước khi lưu bản nháp.');return;}const nextStep=Math.min(5,step+1);if(id&&advance&&!dirty){setStep(nextStep);return;}
+  if(advance && step===1 && fields.title.trim().length<5){setError('Nhập tên dự án có ít nhất 5 ký tự.');return;}
   if(detail && detail.version.versionNo > 1 && !rights){
    setStep(3);setError('Hãy xác nhận quyền cung cấp thông tin và tài liệu trước khi lưu bản sửa.');return;
   }
@@ -110,29 +115,54 @@ export default function ProjectEditor({id,mode='edit',versionId,initialStep=1}:{
  {detail && detail.missingFileCount > 0 && <p className="p2-preview-notice">
   Khi tạo bản sửa, {detail.missingFileCount} tệp của phiên bản nguồn không có trong kho lưu trữ. Kiểm tra mục <strong>Ảnh và tệp</strong> và bổ sung các tệp cần thiết trước khi gửi duyệt.
  </p>}
- {editing&&<ProjectEditorSteps step={step} onChange={setStep} disabled={disabled}/>}
+ {editing&&<ProjectEditorSteps step={step} onChange={goToStep} disabled={disabled} saved={Boolean(detail)}/>}
  {editing&&<form className="project-form" onSubmit={save} aria-busy={disabled}><fieldset disabled={disabled}>
  {step===1&&<section className="project-editor-section">
-  <h2>1. Nội dung công khai</h2>
-  <p className="p2-note">Không nhập thông tin liên hệ hoặc vị trí chính xác vào phần công khai.</p>
-  <div className="p2-quick-panel p2-quick-heading"><div><h3>Bắt đầu từ mẫu</h3><p>Gợi ý tên và loại công trình theo danh mục đã chọn.</p></div>
-   <button type="button" className="button button-secondary" onClick={()=>{setFields(current=>fillEmptyProjectFields(current,quickProjectTemplate(current.category)));setDirty(true);}}>Dùng mẫu theo danh mục</button>
-  </div>
+  <h2>Dự án của bạn ở đâu, đang làm đến đâu?</h2>
+  <p className="p2-note">Phần này sẽ hiện trên sàn sau khi duyệt. Số điện thoại, email và địa chỉ chính xác nhập ở bước 3.</p>
   <div className="project-form-grid">
-   {field('title','Tên dự án')}
-   <label>Danh mục<select value={fields.category} onChange={event=>updateFields({category:event.target.value})}>{Object.entries(categoryLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
-   {field('constructionType','Loại công trình')}{field('provinceCode','Tỉnh / thành')}{field('districtName','Phường / xã')}{field('projectStage','Giai đoạn dự án')}
+   {field('title','Tên dự án *')}
+   <label>Nhóm dự án<select value={fields.category} onChange={event=>updateFields({category:event.target.value})}>{Object.entries(categoryLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
+   {field('provinceCode','Tỉnh / thành *')}{field('projectStage','Giai đoạn hiện tại *')}
+  </div>
+  <p className="p2-note">Các mục có dấu * cần điền trước khi gửi duyệt.</p>
+  <details className="project-editor-extra"><summary>Thêm phường/xã, quy mô, vốn và mô tả</summary>
+  <button type="button" className="button button-secondary" onClick={()=>{setFields(current=>fillEmptyProjectFields(current,quickProjectTemplate(current.category)));setDirty(true);}}>Dùng mẫu theo nhóm dự án</button>
+  <div className="project-form-grid">
+   {field('districtName','Phường / xã')}{field('constructionType','Loại công trình')}
    {factField('landAreaSqm','Diện tích thực địa (m²)')}{factField('scaleSummary','Quy mô dự án')}
    {factField('investmentAmount','Vốn đầu tư')}{factField('investmentCurrency')}
    {factField('expectedStart','Dự kiến khởi công')}
   </div>
   {field('publicSummary','Mô tả công khai (không bắt buộc)',5)}{field('technicalSummary','Thông số được phép công khai',3)}
+  </details>
  </section>}
  {step===2&&!detail&&<section className="project-editor-section"><h2>2. Ảnh và tệp</h2><p>Bấm <strong>Lưu bản nháp</strong> bên dưới để bắt đầu thêm ảnh và tài liệu.</p></section>}
- {step===3&&<section className="project-editor-section project-protected-section"><h2>3. Nội dung bảo vệ</h2><p>Chỉ bạn và kiểm duyệt viên được cấp quyền xem. Người mua chỉ được xem nội dung bảo vệ khi đã mua đúng phiên bản; tài liệu chỉ kiểm duyệt không được bán kèm. Nếu công trình có nhiều gói, hãy ghi rõ hạng mục, phạm vi và mã công trình nếu biết.</p><div className="project-form-grid">{Object.entries(privateLabels).filter(([key])=>key!=='procurementNotes').map(([key,label])=><label key={key}>{label}<textarea rows={key.endsWith('Notes')?3:2} maxLength={key.endsWith('Notes')?5000:500} value={privateData[key]||''} onChange={event=>{setPrivateData({...privateData,[key]:event.target.value});setDirty(true);}}/></label>)}</div><ProjectParticipantEditor rows={participants} onChange={rows=>{setParticipants(rows);setDirty(true);}}/><label className="project-check"><input type="checkbox" checked={rights} onChange={event=>{setRights(event.target.checked);setDirty(true);}}/>Tôi có quyền cung cấp các thông tin và tài liệu này.</label><label>Mẫu khai báo quyền cung cấp<select value="" onChange={event=>{if(event.target.value)updateFields({rightsDeclaration:event.target.value});}}><option value="">Chọn mẫu phù hợp với nguồn tin của bạn</option>{rightsOptions.map(option=><option key={option}>{option}</option>)}</select></label>{field('rightsDeclaration','Khai báo nguồn / quyền cung cấp',3)}</section>}
- {step===4&&<section className="project-editor-section"><h2>4. Giá bán thông tin</h2><p>Đặt giá cho quyền xem thông tin dự án bằng POINT.</p><ProjectPriceSuggestion key={JSON.stringify(priceContext)} context={priceContext} disabled={disabled} onApply={pricePoints=>updateFields({pricePoints})}/>{field('pricePoints','Giá bán (POINT)')}<div className="p2-quick-chips" role="group" aria-label="Chọn nhanh mức giá"><span>Chọn nhanh</span>{quickPrices.map(price=><button key={price} type="button" aria-pressed={fields.pricePoints===price} onClick={()=>updateFields({pricePoints:price})}>{formatPoints(price)} POINT</button>)}</div><p className="p2-note">Giá là số nguyên dương. Người mua dùng POINT để mua quyền truy cập nội dung của đúng phiên bản đã duyệt. Giá của tin đã công bố chỉ đổi sau khi bản đề xuất được duyệt.</p></section>}
+ {step===3&&<section className="project-editor-section project-protected-section">
+  <h2>Người mua sẽ nhận được gì?</h2>
+  <p>Điền những gì bạn biết. Số điện thoại, email và địa chỉ chính xác chỉ mở cho người mua sau khi thanh toán. Kiểm duyệt viên xem được để xét duyệt.</p>
+  <div className="project-form-grid">
+   {[['investorName','Chủ đầu tư'],['contactPerson','Người liên hệ'],['contactPhone','Số điện thoại'],['contactEmail','Email']].map(([key,label])=>
+    <label key={key}>{label}<input value={privateData[key]||''} maxLength={500} type={key==='contactPhone'?'tel':'text'}
+      onChange={event=>{setPrivateData({...privateData,[key]:event.target.value});setDirty(true);}}/></label>)}
+  </div>
+  <details className="project-editor-extra">
+   <summary>Thêm nhà thầu, địa chỉ hoặc thông tin kỹ thuật</summary>
+   <div className="project-form-grid">{Object.entries(privateLabels).filter(([key])=>!['investorName','contactPerson','contactPhone','contactEmail'].includes(key)).map(([key,label])=>
+    <label key={key}>{label}<textarea rows={key.endsWith('Notes')?3:2} maxLength={key.endsWith('Notes')?5000:500}
+      value={privateData[key]||''} onChange={event=>{setPrivateData({...privateData,[key]:event.target.value});setDirty(true);}}/></label>)}</div>
+   <ProjectParticipantEditor rows={participants} onChange={rows=>{setParticipants(rows);setDirty(true);}}/>
+  </details>
+  <h3>Nguồn thông tin</h3>
+  <label>Chọn nguồn có sẵn<select value="" onChange={event=>{if(event.target.value)updateFields({rightsDeclaration:event.target.value});}}>
+   <option value="">Chọn một mẫu hoặc tự ghi bên dưới</option>{rightsOptions.map(option=><option key={option}>{option}</option>)}
+  </select></label>
+  {field('rightsDeclaration','Bạn có thông tin này từ đâu? *',2)}
+  <label className="project-check"><input type="checkbox" checked={rights} onChange={event=>{setRights(event.target.checked);setDirty(true);}}/>Tôi có quyền cung cấp các thông tin và tài liệu này.</label>
+ </section>}
+ {step===4&&<section className="project-editor-section"><h2>Bạn muốn bán thông tin với giá bao nhiêu?</h2><p>Bạn có thể giữ mức có sẵn hoặc chọn giá khác. Người mua thanh toán bằng điểm.</p><details className="project-editor-extra"><summary>Xem gợi ý giá</summary><ProjectPriceSuggestion key={JSON.stringify(priceContext)} context={priceContext} disabled={disabled} onApply={pricePoints=>updateFields({pricePoints})}/></details>{field('pricePoints','Giá bán (POINT)')}<div className="p2-quick-chips" role="group" aria-label="Chọn nhanh mức giá"><span>Chọn nhanh</span>{quickPrices.map(price=><button key={price} type="button" aria-pressed={fields.pricePoints===price} onClick={()=>updateFields({pricePoints:price})}>{formatPoints(price)} POINT</button>)}</div><p className="p2-note">Giá là số nguyên dương. Người mua dùng POINT để mua quyền truy cập nội dung của đúng phiên bản đã duyệt. Giá của tin đã công bố chỉ đổi sau khi bản đề xuất được duyệt.</p></section>}
  {step===5&&<section className="project-editor-section"><h2>5. Kiểm tra trước khi gửi</h2>{issues.length?<div className="p2-validation"><strong>Cần hoàn thiện {issues.length} mục</strong><ul>{issues.map(issue=><li key={issue}>{issue}</li>)}</ul></div>:<p className="identity-success">Thông tin cơ bản đã đầy đủ. Kiểm tra lại nội dung và tệp trước khi gửi.</p>}<p>{dirty?'Bạn đang có thay đổi chưa lưu.':'Bản nháp đã lưu có thể được xem trước và gửi xét duyệt.'}</p><details><summary>Rà soát thông tin bảo vệ của riêng bạn</summary><dl className="identity-details">{Object.entries(privateLabels).map(([key,label])=><div key={key}><dt>{label}</dt><dd>{privateData[key]||'Chưa cung cấp'}</dd></div>)}</dl></details></section>}
- <div className="p2-save-bar"><span>{dirty?'● Có thay đổi chưa lưu':detail?'✓ Đã đồng bộ bản nháp':'Bắt đầu bản nháp mới'}</span><button className={`button ${step<5?'button-secondary':'button-primary'}`} type="submit">{pending?'Đang lưu…':'Lưu bản nháp'}</button>{step<5&&<button type="submit" value="continue" className="button button-primary">{id&&!dirty?'Tiếp tục':'Lưu và tiếp tục'} →</button>}</div>
+ <div className="p2-save-bar"><span>{dirty?'● Có thay đổi chưa lưu':detail?'✓ Đã lưu bản nháp':'Bắt đầu bản nháp mới'}</span><button className={`button ${step<5?'button-secondary':'button-primary'}`} type="submit">{pending?'Đang lưu…':'Lưu bản nháp'}</button>{step>1&&<button type="button" className="button button-secondary" onClick={()=>goToStep(step-1)}>← Quay lại</button>}{step<5&&<button type="submit" value="continue" className="button button-primary">{id&&!dirty?(step===2&&detail?.files.length===0?'Bỏ qua ảnh và tài liệu':'Tiếp tục'):'Lưu và tiếp tục'} →</button>}</div>
  </fieldset></form>}
  {editing&&step===2&&detail&&<ProjectFileUpload detail={detail} disabled={dirty||pending} onBusy={setFileBusy} onSaved={async()=>{await load();setNotice('Đã lưu tệp.');}}/>}
  {detail&&((editing&&step===2)||!editing)&&<section className="project-editor-section"><h2>Tệp của phiên bản v{detail.version.versionNo}</h2><div className="p2-file-grid">{detail.files.map(file=><article key={file.id}><a href={file.url} target="_blank" rel="noopener noreferrer">{file.mimeType==='image/png'?<img src={file.url} alt={file.originalFilename} loading="lazy"/>:'Tải tài liệu'}</a><strong>{file.originalFilename}</strong><span>{accessLabels[file.accessLevel]} · {String(BigInt(file.sizeBytes)/1024n)} KB</span>{editing&&<button type="button" disabled={disabled||dirty} onClick={()=>setCommand({name:'remove-file',fileId:file.id,title:'Gỡ tệp khỏi bản nháp?',description:'Tệp sẽ không còn trong bản nháp đang gửi duyệt. Lịch sử và dữ liệu lưu giữ không bị xóa.'})}>Gỡ khỏi bản nháp</button>}</article>)}</div>{!detail.files.length&&<p className="p2-note">Chưa có tệp trong phiên bản này.</p>}</section>}
