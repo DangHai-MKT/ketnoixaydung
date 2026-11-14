@@ -1,6 +1,6 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
-import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { db } from '../db/client';
 import { auditLogs, moderationReviews, notifications, projectFiles, projectPrivateData, projectVersions, projects, sellerProfiles, userRoles, users } from '../db/schema';
 import { AccessError, requireActive, requireRoles, type Actor } from '../lib/auth/permissions';
@@ -26,11 +26,12 @@ function publicFields(input: ProjectInput) {
   const { privateData: _private, rightsConfirmed: _confirmed, rightsDeclaration: _declaration, ...fields } = input;
   return fields;
 }
-async function savePrivate(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], versionId: string, input: ProjectInput) {
+async function savePrivate(tx: Parameters<Parameters<typeof db.transaction>[0]>[0], versionId: string, input: ProjectInput, priorConfirmation?: Date | null) {
+  const confirmedAt = priorConfirmation ?? (input.rightsConfirmed ? new Date() : null);
   await tx.insert(projectPrivateData).values({ projectVersionId: versionId, privateData: input.privateData,
-    dataRightsConfirmedAt: input.rightsConfirmed ? new Date() : null, dataRightsDeclaration: input.rightsDeclaration })
+    dataRightsConfirmedAt: confirmedAt, dataRightsDeclaration: input.rightsDeclaration })
     .onConflictDoUpdate({ target: projectPrivateData.projectVersionId, set: { privateData: input.privateData,
-      dataRightsConfirmedAt: input.rightsConfirmed ? new Date() : null, dataRightsDeclaration: input.rightsDeclaration, updatedAt: new Date() } });
+      dataRightsConfirmedAt: confirmedAt, dataRightsDeclaration: input.rightsDeclaration, updatedAt: new Date() } });
 }
 export async function createProject(actor: Actor, value: unknown) {
   const input = projectInput(value);
@@ -127,17 +128,22 @@ export async function updateDraft(actor: Actor, id: string, value: unknown) {
     const version = await workingVersion(tx, project);
     if (version.id !== versionId) throw new AccessError(409, 'Phiên bản đề xuất đã thay đổi.');
     assertDraft(version);
-    if (version.versionNo > 1 && !input.rightsConfirmed) {
-      throw new AccessError(400, 'Hãy xác nhận quyền cung cấp thông tin và tài liệu trước khi lưu bản sửa.');
+    const [prior] = await tx.select().from(projectPrivateData).where(eq(projectPrivateData.projectVersionId, version.id));
+    let confirmedAt = prior?.dataRightsConfirmedAt;
+    if (!confirmedAt && version.versionNo > 1) {
+      const [previous] = await tx.select({ confirmedAt: projectPrivateData.dataRightsConfirmedAt })
+        .from(projectPrivateData).innerJoin(projectVersions, eq(projectVersions.id, projectPrivateData.projectVersionId))
+        .where(and(eq(projectVersions.projectId, id), lt(projectVersions.versionNo, version.versionNo),
+          isNotNull(projectPrivateData.dataRightsConfirmedAt)))
+        .orderBy(desc(projectVersions.versionNo)).limit(1);
+      confirmedAt = previous?.confirmedAt;
     }
     await tx.update(projectVersions).set(publicFields(input)).where(eq(projectVersions.id, version.id));
     if (!Object.hasOwn(input.privateData, 'participants')) {
-      const [prior] = await tx.select({ data: projectPrivateData.privateData }).from(projectPrivateData)
-        .where(eq(projectPrivateData.projectVersionId, version.id));
-      const participants = readProjectParticipants(prior?.data.participants);
+      const participants = readProjectParticipants(prior?.privateData.participants);
       if (participants.length) input.privateData.participants = participants;
     }
-    await savePrivate(tx, version.id, input);
+    await savePrivate(tx, version.id, input, confirmedAt);
     const [updated] = await tx.update(projects).set({ revision: project.revision + 1, updatedAt: new Date() }).where(eq(projects.id, id)).returning();
     await projectEvent(tx, actor.id, updated, 'project.draft_saved', version.id);
     return { id, revision: updated.revision };
@@ -198,7 +204,7 @@ export async function proposeRevision(actor: Actor, id: string, expected: number
     const [version] = await tx.insert(projectVersions).values({ ...content, projectId: id, versionNo: number, submittedBy: actor.id, submissionStatus: 'draft' }).returning();
     const [privateRow] = await tx.select().from(projectPrivateData).where(eq(projectPrivateData.projectVersionId, source.id));
     if (privateRow) await tx.insert(projectPrivateData).values({ projectVersionId: version.id, privateData: privateRow.privateData,
-      dataRightsDeclaration: privateRow.dataRightsDeclaration, dataRightsConfirmedAt: null });
+      dataRightsDeclaration: privateRow.dataRightsDeclaration, dataRightsConfirmedAt: privateRow.dataRightsConfirmedAt });
     const files = await activeProjectFiles(tx, source.id);
     if (files.length > uploadLimits().maxDocuments) throw new AccessError(409, 'Phiên bản nguồn có quá nhiều tệp để sao chép.');
     const copies: { file: typeof files[number]; bytes: Buffer }[] = [];
