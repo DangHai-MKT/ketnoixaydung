@@ -61,6 +61,17 @@ export async function processRefund(actor:Actor,id:string,input:unknown){settlem
  });}
 
 const caseHold=sql<boolean>`(EXISTS (SELECT 1 FROM disputes d WHERE d.purchase_id=${purchaseOrders.id} AND d.status IN ('open','under_review')) OR EXISTS (SELECT 1 FROM refunds r WHERE r.purchase_id=${purchaseOrders.id} AND r.status IN ('requested','approved')) OR ${sellerEarnings.status}='disputed')`;
+export async function listAutomaticReleaseCandidates(actor:Actor, after:string|null) {
+ return db.transaction(async tx=>{
+  await financeReadActor(tx,actor);
+  return tx.select({id:sellerEarnings.id}).from(sellerEarnings)
+   .innerJoin(purchaseOrders,eq(purchaseOrders.id,sellerEarnings.purchaseId))
+   .where(and(eq(sellerEarnings.status,'held'),eq(purchaseOrders.status,'completed'),
+    sql`${sellerEarnings.heldUntil}<=now()`,sql`NOT ${caseHold}`,
+    after ? sql`${sellerEarnings.id} > ${after}::uuid` : undefined))
+   .orderBy(asc(sellerEarnings.id)).limit(50);
+ },{accessMode:'read only'});
+}
 export async function listReleases(actor:Actor,q:ReturnType<typeof settlementQuery>){return db.transaction(async tx=>{await financeReadActor(tx,actor);const now=new Date(),where=q.status==='due'?and(eq(sellerEarnings.status,'held'),eq(purchaseOrders.status,'completed'),sql`${sellerEarnings.heldUntil}<=${now}`,sql`NOT ${caseHold}`):q.status?eq(sellerEarnings.status,q.status as 'held'):undefined;
  const rows=await tx.select({id:sellerEarnings.id,purchaseId:purchaseOrders.id,title:projectVersions.title,sellerName:users.displayName,points:sql<string>`${sellerEarnings.netPoints}::text`,status:sellerEarnings.status,heldUntil:sellerEarnings.heldUntil,releasedAt:sellerEarnings.releasedAt,blocked:caseHold}).from(sellerEarnings).innerJoin(purchaseOrders,eq(purchaseOrders.id,sellerEarnings.purchaseId)).innerJoin(projectVersions,eq(projectVersions.id,purchaseOrders.projectVersionId)).innerJoin(users,eq(users.id,sellerEarnings.sellerId)).where(where).orderBy(asc(sellerEarnings.heldUntil),asc(sellerEarnings.id)).limit(20).offset((q.page-1)*20);const [count]=await tx.select({total:sql<number>`count(*)::int`}).from(sellerEarnings).innerJoin(purchaseOrders,eq(purchaseOrders.id,sellerEarnings.purchaseId)).where(where);return {rows,total:count.total,page:q.page,status:q.status,canRelease:payoutOperationsEnabled()};
  },{isolationLevel:'repeatable read',accessMode:'read only'});}

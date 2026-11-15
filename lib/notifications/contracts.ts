@@ -1,6 +1,6 @@
 import {AccessError} from '../auth/permissions';
 
-const fixedPaths=new Set(['/account','/account/wallet','/account/project-watch','/seller','/seller/application','/seller/transactions','/seller/earnings','/seller/withdrawals/new','/admin/feedback']);
+const fixedPaths=new Set(['/account','/account/wallet','/account/project-watch','/seller','/seller/application','/seller/transactions','/seller/earnings','/seller/withdrawals/new','/admin/feedback','/admin/earnings']);
 const detailPaths=/^\/(?:projects|account\/(?:purchases|wallet\/top-ups|refunds|disputes)|seller\/(?:projects|refunds|disputes|withdrawals)|admin\/(?:disputes|refunds|sellers|payments|withdrawals))\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const uuidPattern='[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}';
 const purchaseChatPath=new RegExp(`^/(?:account/purchases|seller/transactions)/${uuidPattern}/chat$`,'i');
