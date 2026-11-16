@@ -14,6 +14,7 @@ import './project-marketplace.css';
 import './purchase-chat.css';
 import './auth-experience.css';
 import './finance.css';
+import './partner-requests.css';
 import './editorial.css';
 import './cms.css';
 import './notifications.css';

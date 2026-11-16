@@ -6,8 +6,9 @@ const uuidPattern='[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}';
 const purchaseChatPath=new RegExp(`^/(?:account/purchases|seller/transactions)/${uuidPattern}/chat$`,'i');
 const projectReviewPath=new RegExp(`^/admin/projects/${uuidPattern}\\?version=${uuidPattern}$`,'i');
 const payoutAccountPath=new RegExp(`^/(?:seller|admin)/payout-accounts/${uuidPattern}$`,'i');
+const partnerPath=new RegExp(`^/(?:find-partners|admin/partner-requests)/${uuidPattern}$`,'i');
 export function notificationHref(value: unknown) {
-  return typeof value==='string'&&(fixedPaths.has(value)||detailPaths.test(value)||projectReviewPath.test(value)||purchaseChatPath.test(value)||payoutAccountPath.test(value))?value:null;
+  return typeof value==='string'&&(fixedPaths.has(value)||detailPaths.test(value)||projectReviewPath.test(value)||purchaseChatPath.test(value)||payoutAccountPath.test(value)||partnerPath.test(value))?value:null;
 }
 
 export function notificationQuery(params: URLSearchParams) {

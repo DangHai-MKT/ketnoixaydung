@@ -18,6 +18,7 @@ export function dashboardNavigation(mode: DashboardMode, roles: readonly Role[],
     const finance = roles.some(role => role === 'finance_operator' || role === 'super_admin');
     const support = roles.some(role => role === 'support_operator' || role === 'super_admin');
     return [{ label: 'Tổng quan', href: '/admin', icon: 'dashboard' },
+      ...(support ? [{ label: 'Tìm đối tác', href: '/admin/partner-requests', icon: 'users' }] : []),
       ...(moderator ? [{ label: 'Quản lý dự án', href: '/admin/projects', icon: 'file', children: [
         { label: 'Dự án chờ duyệt', href: '/admin/projects' }, { label: 'Dự án đã công bố', href: '/admin/projects?status=published' },
         { label: 'Báo cáo vi phạm', href: '#project-reports', disabled: true }, { label: 'Danh mục & khu vực', href: '/admin#admin-regions' },

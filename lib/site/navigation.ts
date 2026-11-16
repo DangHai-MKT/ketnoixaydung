@@ -8,6 +8,7 @@ export const siteIdentity = {
 export const primaryNavigation: readonly { label: string; href: string; icon?: string }[] = [
   { label: 'Trang chủ', href: '/' },
   { label: 'Dự án', href: '/projects', icon: 'file' },
+  { label: 'Tìm đối tác', href: '/find-partners' },
   { label: 'Hướng dẫn', href: '/guides', icon: 'book' },
   { label: 'Liên hệ', href: '/contact' },
 ];

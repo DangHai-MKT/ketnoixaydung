@@ -18,6 +18,15 @@ const { notificationHref } = await import(moduleUrl(
 const { chatPath } = await import(moduleUrl(await read('lib/projects/purchase-chat.ts')));
 const purchaseId = '97d137a0-9b67-4fab-9aa9-2f59a681ca2e';
 
+test('Partner notifications accept only the expected internal request links', () => {
+  for (const base of ['/find-partners', '/admin/partner-requests']) {
+    const href = base + '/' + purchaseId;
+    assert.equal(notificationHref(href), href);
+    assert.equal(notificationHref(href + '/edit'), null);
+    assert.equal(notificationHref('https://example.com' + href), null);
+  }
+});
+
 test('Chat notifications lead to the relevant buyer or seller conversation', () => {
   for (const side of ['buyer', 'seller']) {
     const path = chatPath(side, purchaseId);

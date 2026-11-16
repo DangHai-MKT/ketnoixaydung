@@ -33,5 +33,9 @@ export default async function nextConfig(phase) {
     const { runPurchaseChatMigration } = await import('./scripts/apply-purchase-chat-0013.mjs');
     await runPurchaseChatMigration();
   }
+  if (phase === nextConstants.PHASE_PRODUCTION_SERVER && !isolatedAuthTest && process.env.PARTNER_REQUESTS_SQL_0014 === '1') {
+    const { runPartnerRequestsMigration } = await import('./scripts/apply-partner-requests-0014.mjs');
+    await runPartnerRequestsMigration();
+  }
   return config;
 }

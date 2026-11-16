@@ -832,6 +832,30 @@ export const auditLogs = pgTable('audit_logs', {
   }).onDelete('set null'),
 ]);
 
+export const partnerRequests = pgTable('partner_requests', {
+  id: uuid('id').primaryKey(),
+  ownerId: uuid('owner_id').notNull().references(() => users.id),
+  trade: text('trade').notNull(),
+  province: text('province').notNull(),
+  scope: text('scope').notNull(),
+  timing: text('timing').notNull(),
+  createdAt: now(),
+  closedAt: timestamp('closed_at', { withTimezone: true }),
+});
+export const partnerReplies = pgTable('partner_replies', {
+  requestId: uuid('request_id').notNull().references(() => partnerRequests.id),
+  authorId: uuid('author_id').notNull().references(() => users.id),
+  kind: text('kind').notNull(),
+}, t => [primaryKey({columns:[t.requestId,t.authorId]}), check('partner_replies_kind_check',sql`${t.kind} IN ('interested','referral')`)]);
+export const partnerIntroductions = pgTable('partner_introductions', {
+  id: uuid('id').primaryKey(),
+  requestId: uuid('request_id').notNull().references(() => partnerRequests.id),
+  staffId: uuid('staff_id').notNull().references(() => users.id),
+  name: text('name').notNull(),
+  note: text('note').notNull(),
+  createdAt: now(),
+});
+
 export const purchaseMessages = pgTable('purchase_messages', {
   id: uuid('id').primaryKey(),
   purchaseId: uuid('purchase_id').notNull().references(() => purchaseOrders.id, { onDelete: 'restrict' }),
