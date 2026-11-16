@@ -1,4 +1,5 @@
 import 'server-only';
+import { setTimeout as delay } from 'node:timers/promises';
 import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import { db, pool } from '../db/client';
 import { notifications, userRoles, users } from '../db/schema';
@@ -16,7 +17,28 @@ const advisoryKey = 671280615;
 let started = false;
 
 function errorCode(error: unknown) {
-  return error instanceof AccessError ? `ACCESS_${error.status}` : safeErrorCode(error);
+  if (error instanceof AccessError) return `ACCESS_${error.status}`;
+  let cause = error;
+  for (let depth = 0; depth < 6 && cause && typeof cause === 'object'; depth++) {
+    const failure = cause as { code?: string; message?: string; cause?: unknown };
+    if (failure.code && ['28P01','28000','3D000','53300','57P03','EAI_AGAIN','ENOTFOUND','ECONNRESET'].includes(failure.code)) return failure.code;
+    if (failure.message && ['timeout exceeded when trying to connect','Connection terminated due to connection timeout','timeout expired'].includes(failure.message)) return 'CONNECT_TIMEOUT';
+    cause = failure.cause;
+  }
+  return safeErrorCode(error);
+}
+
+async function connectForRelease() {
+  for (const wait of [2000, 5000]) {
+    try { return await pool.connect(); }
+    catch (error) {
+      const code = errorCode(error);
+      if (!['CONNECT_TIMEOUT','ETIMEDOUT','ECONNREFUSED','EAI_AGAIN','ECONNRESET','53300','57P03'].includes(code)) throw error;
+      console.warn('[earnings-release] CONNECT_RETRY', {code, waitMs:wait});
+      await delay(wait);
+    }
+  }
+  return pool.connect();
 }
 
 async function alertFinance(earningId: string) {
@@ -52,7 +74,7 @@ export function startEarningsRelease(actorId: string) {
         return;
       }
       stage = 'connect';
-      const client = await pool.connect();
+      const client = await connectForRelease();
       let locked = false;
       try {
         stage = 'lock';
