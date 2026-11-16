@@ -2,7 +2,8 @@ import 'server-only';
 import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import { db, pool } from '../db/client';
 import { notifications, userRoles, users } from '../db/schema';
-import type { Actor } from '../lib/auth/permissions';
+import { AccessError, type Actor } from '../lib/auth/permissions';
+import { safeErrorCode } from '../lib/auth/error-diagnostics';
 import { settlementId } from '../lib/finance/settlement';
 import { listAutomaticReleaseCandidates, releaseEarning } from './settlements';
 import { payoutOperationsEnabled } from './settlement-core';
@@ -13,6 +14,10 @@ const reason = 'Hệ thống tự động giải phóng thu nhập đã đến h
 const alertType = 'earning.auto_release_review';
 const advisoryKey = 671280615;
 let started = false;
+
+function errorCode(error: unknown) {
+  return error instanceof AccessError ? `ACCESS_${error.status}` : safeErrorCode(error);
+}
 
 async function alertFinance(earningId: string) {
   await db.transaction(async tx => {
@@ -40,17 +45,21 @@ export function startEarningsRelease(actorId: string) {
   let cursor: string | null = null;
 
   async function tick() {
+    let stage = 'check-configuration';
     try {
       if (!payoutOperationsEnabled()) {
         console.warn('[earnings-release] PAYOUT_OPERATIONS_DISABLED');
         return;
       }
+      stage = 'connect';
       const client = await pool.connect();
       let locked = false;
       try {
+        stage = 'lock';
         const lock = await client.query('SELECT pg_try_advisory_lock($1) AS locked', [advisoryKey]);
         locked = lock.rows[0].locked === true;
         if (!locked) return;
+        stage = 'list-candidates';
         const rows = await listAutomaticReleaseCandidates(actor, cursor);
         let released = 0;
         let failed = 0;
@@ -60,9 +69,13 @@ export function startEarningsRelease(actorId: string) {
           if (Date.now() >= deadline) break;
           try {
             if (!(await releaseEarning(actor, row.id, reason)).reused) released++;
-          } catch {
+          } catch (error) {
             failed++;
-            await alertFinance(row.id);
+            console.warn('[earnings-release] ITEM_FAILED', { code: errorCode(error) });
+            try { await alertFinance(row.id); }
+            catch (alertError) {
+              console.error('[earnings-release] ALERT_FAILED', { code: errorCode(alertError) });
+            }
           }
           cursor = row.id;
           processed++;
@@ -77,8 +90,8 @@ export function startEarningsRelease(actorId: string) {
           client.release(true);
         }
       }
-    } catch {
-      console.error('[earnings-release] FAILED: kiểm tra quyền tài chính và kết nối PostgreSQL.');
+    } catch (error) {
+      console.error('[earnings-release] FAILED', { stage, code: errorCode(error) });
     } finally {
       setTimeout(() => void tick(), interval).unref();
     }
