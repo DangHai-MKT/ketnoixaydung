@@ -114,3 +114,4 @@
   .partner-company-grid { gap:14px; }
   .partner-company-facts { grid-template-columns:1fr; }
 }
+.partner-contact-unlocked .partner-contact-address { margin-block:10px; line-height:1.6; }

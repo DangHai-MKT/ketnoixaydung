@@ -48,20 +48,20 @@ export default async function PartnerCompanyResults({keyword,province,page,showR
         {profile.experience&&<p className="partner-company-experience">{profile.experience}</p>}
         {unlocked.has(id)?<div className="partner-contact-unlocked"><strong>Liên hệ nhà cung cấp · Đã mở khóa</strong>
         {profile.contactPerson&&<p>{profile.contactPerson}</p>}
+        {profile.address&&<p className="partner-contact-address"><strong>Địa chỉ</strong><br/>{profile.address}</p>}
         <div className="fw-actions partner-company-links">
           {profile.phone&&<a className="button button-primary" href={'tel:'+profile.phone.replace(/[^+0-9]/g,'')}>Gọi {profile.phone}</a>}
           {profile.zalo&&<a className="button button-secondary" href={profile.zalo} target="_blank" rel="noreferrer">Zalo</a>}
           {profile.email&&<a className="button button-secondary" href={'mailto:'+encodeURIComponent(profile.email)}>Gửi email</a>}
         </div></div>:<div className="partner-contact-locked"><strong>Liên hệ nhà cung cấp</strong>
-          <p>{[profile.contactPerson&&'Người phụ trách',profile.phone&&'Điện thoại',profile.email&&'Email',profile.zalo&&'Zalo'].filter(Boolean).join(' · ') || 'Chưa có đầu mối liên hệ.'}</p>
+          <p>{[profile.contactPerson&&'Người phụ trách',profile.phone&&'Điện thoại',profile.email&&'Email',profile.zalo&&'Zalo',profile.address&&'Địa chỉ'].filter(Boolean).join(' · ') || 'Chưa có đầu mối liên hệ.'}</p>
           {[profile.phone,profile.email,profile.zalo].some(Boolean)?actor?.status==='active'?
             <details><summary>Mở liên hệ · 50 POINT</summary><p>Trừ 50 POINT một lần cho doanh nghiệp này. Những lần xem lại miễn phí.</p>
               <PartnerRequestForm action={unlockCompanyContact.bind(null,id)} label="Xác nhận mua · 50 POINT"/></details>
             :<a className="button button-primary" href="/login?next=%2Ffind-partners">Đăng nhập để mở liên hệ · 50 POINT</a>
             :<p>Đang cập nhật thông tin liên hệ.</p>}
         </div>}
-        <details><summary>Địa chỉ và nguồn hồ sơ</summary>
-          {profile.address&&<p>{profile.address}</p>}
+        <details><summary>Nguồn hồ sơ</summary>
           <div className="fw-actions">{website&&<a href={website} target="_blank" rel="noreferrer">Website</a>}
             <a href={source} target="_blank" rel="noreferrer">Xem nguồn ↗</a></div>
         </details>
