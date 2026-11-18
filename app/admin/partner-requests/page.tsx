@@ -11,6 +11,7 @@ export default async function Page({searchParams}:{searchParams:Promise<{page?:s
   });
   return <main className="partner-page">
     <header className="partner-hero"><h1>Nhu cầu tìm đối tác</h1><p>Chọn nhu cầu để xem công việc và gửi giới thiệu.</p></header>
+    <p><a className="button button-primary" href="/admin/partner-directory">Danh bạ doanh nghiệp · Nhập CSV</a></p>
     {rows===null ? <section className="partner-card"><p role="status">Cần áp dụng SQL 0014 để mở danh sách.</p></section> :
     <section className="partner-card">
       {rows.length ? <ul className="partner-items">{rows.slice(0,20).map(row=><li key={row.id}><a href={'/admin/partner-requests/'+row.id}>{row.trade}</a><small>{row.province} · {row.timing}</small></li>)}</ul>:<p>Chưa có nhu cầu ở trang này.</p>}

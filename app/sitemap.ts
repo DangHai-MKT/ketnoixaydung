@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const origin = publicOrigin();
   if (!origin) return [];
-  const paths = ['/', '/projects', ...Object.keys(editorialPages)];
+  const paths = ['/', '/projects', '/find-partners', ...Object.keys(editorialPages)];
   if (cmsEnabled()) paths.push('/news');
   const content = await listCmsSitemapEntries(50000 - paths.length);
   const projects = await listProjectSitemapEntries(50000 - paths.length - content.length);

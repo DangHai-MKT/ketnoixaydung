@@ -37,5 +37,9 @@ export default async function nextConfig(phase) {
     const { runPartnerRequestsMigration } = await import('./scripts/apply-partner-requests-0014.mjs');
     await runPartnerRequestsMigration();
   }
+  if (phase === nextConstants.PHASE_PRODUCTION_SERVER && !isolatedAuthTest && process.env.PARTNER_DIRECTORY_SETUP === '1') {
+    const { runDirectoryMigration } = await import('./scripts/apply-partner-directory.mjs');
+    await runDirectoryMigration();
+  }
   return config;
 }

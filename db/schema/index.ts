@@ -832,6 +832,29 @@ export const auditLogs = pgTable('audit_logs', {
   }).onDelete('set null'),
 ]);
 
+export const companyContactAccess = pgTable('company_contact_access', {
+  buyerId: uuid('buyer_id').notNull().references(() => users.id),
+  companyId: uuid('company_id').notNull().references(():AnyPgColumn => partnerCompanies.id),
+  ledgerId: uuid('ledger_id').notNull().unique().references(() => ledgerTransactions.id),
+  pricePoints: bigint('price_points',{mode:'bigint'}).notNull(),
+  createdAt: now(),
+}, t => [primaryKey({columns:[t.buyerId,t.companyId]}),check('company_contact_access_price_points_check',sql`${t.pricePoints}=50`)]);
+
+export const partnerCompanies = pgTable('partner_companies', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identityKey: text('identity_key').notNull().unique(),
+  taxCode: text('tax_code').unique(),
+  name: text('name').notNull(),
+  trade: text('trade').notNull(),
+  province: text('province').notNull(),
+  website: text('website'),
+  sourceUrl: text('source_url').notNull(),
+  profile: jsonb('profile').$type<Partial<Record<string,string>>>().notNull().default({}),
+  publishedAt: timestamp('published_at', {withTimezone:true}),
+  importedBy: uuid('imported_by').notNull().references(() => users.id),
+  createdAt: now(),
+});
+
 export const partnerRequests = pgTable('partner_requests', {
   id: uuid('id').primaryKey(),
   ownerId: uuid('owner_id').notNull().references(() => users.id),
