@@ -6,10 +6,13 @@ import {listPartnerRequests,partnerSchemaUnavailable} from '../../../services/pa
 import {PartnerRequestForm} from '../../../components/PartnerRequestForm';
 import PartnerCompanyResults from '../../../components/PartnerCompanyResults';
 import Icon from '../../../components/MarketplaceIcon';
+import PartnerCompanySearch from '../../../components/PartnerCompanySearch';
+import vietnamWards from '../../../lib/projects/vietnam-wards.json';
+const wardsByProvince:Readonly<Record<string,readonly string[]>>=vietnamWards;
 import {breadcrumbJson,publicMetadata,privateRobots} from '../../../lib/site/seo';
 
 export const dynamic = 'force-dynamic';
-type Search = {page?:string;requests?:string;q?:string;province?:string;request?:string};
+type Search = {page?:string;requests?:string;q?:string;province?:string;ward?:string;request?:string};
 export async function generateMetadata({searchParams}:{searchParams:Promise<Search>}) {
   const params=await searchParams;
   const metadata=publicMetadata('/find-partners','Tìm đối tác xây dựng, nhà thầu và đơn vị thi công',
@@ -17,15 +20,16 @@ export async function generateMetadata({searchParams}:{searchParams:Promise<Sear
   return Object.values(params).some(Boolean) ? {...metadata,robots:privateRobots} : metadata;
 }
 
-export default async function Page({searchParams}:{searchParams:Promise<{page?:string;requests?:string;q?:string;province?:string;request?:string}>}) {
+export default async function Page({searchParams}:{searchParams:Promise<{page?:string;requests?:string;q?:string;province?:string;ward?:string;request?:string}>}) {
   const [actor,params] = await Promise.all([getCurrentActor(),searchParams]);
   const signedIn = actor?.status === 'active';
   const pageNumber=(value:unknown)=>typeof value==='string' && /^[1-9]\d{0,3}$/.test(value) ? Number(value) : 1;
   const page=pageNumber(params.page), requestPage=pageNumber(params.requests);
   const keyword=typeof params.q==='string' ? params.q.trim().slice(0,100) : '';
   const province=typeof params.province==='string' && provinceOptions.includes(params.province) ? params.province : '';
+  const ward=typeof params.ward==='string' && Object.hasOwn(wardsByProvince,province) && wardsByProvince[province].includes(params.ward) ? params.ward : '';
   const showRequest=params.request==='1';
-  const filters={q:keyword,province,...(page>1 ? {page:String(page)} : {})};
+  const filters={q:keyword,province,ward,...(page>1 ? {page:String(page)} : {})};
   const requestHref='?'+new URLSearchParams({...filters,request:'1'})+'#dang-nhu-cau';
   const requestHistory=(next:number)=>'?'+new URLSearchParams({...filters,request:'1',requests:String(next)})+'#nhu-cau-cua-ban';
   const rows = signedIn && showRequest ? await listPartnerRequests(actor,false,requestPage).catch(error=>{
@@ -42,15 +46,9 @@ export default async function Page({searchParams}:{searchParams:Promise<{page?:s
       <p>Đúng chuyên môn.<br/><strong>Thuận đường hợp tác.</strong></p>
       <span>Từ đội thi công đến nhà thầu trọn gói — tìm đơn vị cho công việc bạn đang cần.</span>
       </div>
-      <form action="/find-partners#ket-qua" className="partner-hub-search">
-        <label>Chuyên môn hoặc tên công ty<input name="q" maxLength={100} defaultValue={keyword} placeholder="Ví dụ: PCCC, cơ điện, thi công nhà xưởng"/></label>
-        <label>Địa bàn doanh nghiệp<select name="province" defaultValue={province}><option value="">Toàn quốc</option>
-          {provinceOptions.map(name=><option key={name}>{name}</option>)}</select></label>
-        <button className="button button-primary" type="submit"><Icon name="search" size={18}/> Tìm đối tác</button>
-        {(keyword||province)&&<a href="/find-partners#ket-qua">Xóa bộ lọc</a>}
-      </form>
+      <PartnerCompanySearch key={JSON.stringify([keyword,province,ward])} keyword={keyword} province={province} ward={ward}/>
       <div className="partner-quick-search"><span>Tìm nhanh</span>{['Thi công nhà xưởng','PCCC','Cơ điện','Thiết kế','Kết cấu thép'].map(trade=>
-        <a key={trade} href={'?'+new URLSearchParams({q:trade,province})+'#ket-qua'} aria-current={keyword===trade?'true':undefined}>{trade}</a>)}</div>
+        <a key={trade} href={'?'+new URLSearchParams({q:trade,province,ward})+'#ket-qua'} aria-current={keyword===trade?'true':undefined}>{trade}</a>)}</div>
     </header>
     <div className="partner-help-strip">
       <div><Icon name="search" size={23}/><span><strong>Tìm theo công việc</strong><small>Chuyên môn và địa bàn rõ ràng</small></span></div>
@@ -58,7 +56,7 @@ export default async function Page({searchParams}:{searchParams:Promise<{page?:s
       <div><Icon name="users" size={23}/><span><strong>Kết nối khi phù hợp</strong><small>Mở liên hệ hoặc nhờ sàn giới thiệu</small></span></div>
     </div>
     {signedIn&&<div className="partner-hub-tools"><a href={requestHistory(1)}>Nhu cầu của tôi →</a></div>}
-    <PartnerCompanyResults keyword={keyword} province={province} page={page} showRequest={showRequest}/>
+    <PartnerCompanyResults keyword={keyword} province={province} ward={ward} page={page} showRequest={showRequest}/>
     {showRequest ? <div id="dang-nhu-cau" className="partner-layout partner-request-panel">
     {rows===null ? <section className="partner-card"><p role="status">Tính năng đang được thiết lập. Vui lòng quay lại sau.</p></section> : signedIn ? <>
       <section className="partner-card"><h2>Đăng nhu cầu tìm đối tác</h2>

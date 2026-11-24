@@ -18,7 +18,7 @@ export async function buyCompanyContact(actor:Actor, companyId:string) {
     const [prior]=await tx.select().from(companyContactAccess).where(and(eq(companyContactAccess.buyerId,actor.id),eq(companyContactAccess.companyId,companyId)));
     if(prior)return;
     const [company]=await tx.select().from(partnerCompanies).where(and(eq(partnerCompanies.id,companyId),isNotNull(partnerCompanies.publishedAt))).for('update');
-    if(!company || ![company.profile.phone,company.profile.email,company.profile.zalo].some(Boolean))throw new AccessError(409,'Hồ sơ chưa có liên hệ để mở khóa.');
+    if(!company || ![company.profile.phone,company.profile.hotline,company.profile.email,company.profile.zalo].some(Boolean))throw new AccessError(409,'Hồ sơ chưa có liên hệ để mở khóa.');
     const code='SYS:POINT:platform_revenue';
     await tx.insert(wallets).values({userId:null,unit:'POINT',bucket:'platform_revenue',isSystem:true,accountCode:code,description:'POINT account'}).onConflictDoNothing();
     const accounts=await tx.select().from(wallets).where(or(eq(wallets.accountCode,code),

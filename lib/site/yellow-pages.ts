@@ -73,6 +73,7 @@ export function extractYellowPages(html:string, source:string) {
   const fields = {address:address.slice(0,400),year:valueAfter('Năm thành lập').match(/^\d{4}$/)?.[0] ?? '',
     phone,email,zalo,market:valueAfter('Thị trường chính').slice(0,200),work:valueAfter('Khách hàng chính').slice(0,300),experience:'',
     contactPerson:(contactPerson || (contactIndex<0 ? valueAfter('Người phụ trách') : '')).slice(0,150),
-    employees:valueAfter('Số lượng nhân viên').slice(0,100)};
+    employees:valueAfter('Số lượng nhân viên').slice(0,100),ward:'',
+    hotline:plain(profile).match(/Hotline\s*:?\s*(\+?\d(?:[ .()-]*\d){8,11})/i)?.[1] ?? ''};
   return {name,trade,province,taxCode,website:clean(website),sourceUrl:url.href,listingId:url.pathname.split('/')[2],address,profile:fields};
 }

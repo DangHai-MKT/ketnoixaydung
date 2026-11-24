@@ -1,3 +1,3 @@
-﻿ten_cong_ty,chuyen_mon,tinh_thanh,ma_so_thue,website,nguon_url,dia_chi,nam_thanh_lap,dien_thoai,email,zalo,khu_vuc_nhan_viec,loai_cong_trinh,kinh_nghiem,nguoi_phu_trach,so_luong_nhan_vien
-Công ty Minh Họa A,Thi công PCCC,Đồng Nai,,https://example.com,https://example.com/ho-so-a,,2012,,lienhe@example.com,,Đồng Nai,Nhà xưởng,,,
-Công ty Minh Họa B,"Cơ điện, cấp thoát nước",TP. Hồ Chí Minh,,,https://example.com/ho-so-b,,,,,,TP. Hồ Chí Minh,,,,
+﻿ten_cong_ty,chuyen_mon,tinh_thanh,ma_so_thue,website,nguon_url,dia_chi,nam_thanh_lap,dien_thoai,email,hotline,khu_vuc_nhan_viec,loai_cong_trinh,kinh_nghiem,nguoi_phu_trach,so_luong_nhan_vien,phuong,zalo
+Công ty Minh Họa A,Thi công PCCC,Đồng Nai,,https://example.com,https://example.com/ho-so-a,,2012,,lienhe@example.com,,Đồng Nai,Nhà xưởng,,,,,
+Công ty Minh Họa B,"Cơ điện, cấp thoát nước",TP. Hồ Chí Minh,,,https://example.com/ho-so-b,,,,,,TP. Hồ Chí Minh,,,,,,

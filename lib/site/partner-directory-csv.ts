@@ -1,17 +1,25 @@
-import { provinceOptions } from '../projects/locations';
+import { provinceOptions,projectProvinceFilterAliases } from '../projects/locations';
 
 export const profileFields = [
   ['address','dia_chi','Địa chỉ',400], ['year','nam_thanh_lap','Năm thành lập',4],
   ['phone','dien_thoai','Điện thoại doanh nghiệp',40], ['email','email','Email doanh nghiệp',254],
-  ['zalo','zalo','Liên kết Zalo',300], ['market','khu_vuc_nhan_viec','Khu vực nhận việc',200],
-  ['work','loai_cong_trinh','Loại công trình',300], ['experience','kinh_nghiem','Kinh nghiệm hoặc công trình tiêu biểu',600],
+  ['hotline','hotline','Hotline',40], ['market','khu_vuc_nhan_viec','Khu vực nhận việc',200],
+  ['work','loai_cong_trinh','Loại công trình',5000], ['experience','kinh_nghiem','Kinh nghiệm hoặc công trình tiêu biểu',10000],
   ['contactPerson','nguoi_phu_trach','Người phụ trách',150],
   ['employees','so_luong_nhan_vien','Số lượng nhân viên',100],
+  ['ward','phuong','Phường/xã',150],
+  ['zalo','zalo','Liên kết Zalo',1000],
 ] as const;
 const originalColumns = ['ten_cong_ty', 'chuyen_mon', 'tinh_thanh', 'ma_so_thue', 'website', 'nguon_url'] as const;
 export const directoryColumns = [...originalColumns,...profileFields.map(([,column])=>column)];
-export const directoryMaxBytes = 256 * 1024;
-const maxRows = 500;
+export const directoryMaxBytes = 10 * 1024 * 1024;
+export const directoryMaxRows = 10000;
+const locationKey=(s:string)=>s.normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().replaceAll('đ','d')
+  .replace(/^(tinh|thanh pho|tp\.?)\s+/,'').replace(/[^a-z0-9]/g,'');
+function currentProvince(value:string) {
+  return provinceOptions.find(p=>locationKey(p)===locationKey(value))
+    ?? provinceOptions.find(p=>projectProvinceFilterAliases(p).some(a=>locationKey(a)===locationKey(value))) ?? value;
+}
 
 function parseRows(text: string) {
   const rows: string[][] = [];
@@ -51,25 +59,36 @@ function webUrl(value: string) {
 }
 
 export function parsePartnerDirectory(text: string) {
-  if (new TextEncoder().encode(text).length > directoryMaxBytes) throw Error('Tệp vượt quá 256 KB.');
-  const [header, ...rows] = parseRows(text.replace(/^\uFEFF/, ''));
-  const columns = header?.length===originalColumns.length ? originalColumns :
-    [14,15].includes(header?.length ?? 0) ? directoryColumns.slice(0,header.length) : directoryColumns;
-  if (header?.length !== columns.length || columns.some((column,index)=>header[index]!==column)) {
-    throw Error('Tiêu đề cột chưa đúng. Tải CSV mẫu và giữ nguyên thứ tự cột.');
+  if (new TextEncoder().encode(text).length > directoryMaxBytes) throw Error('Tệp vượt quá 10 MB.');
+  const [rawHeader, ...rawRows] = parseRows(text.replace(/^\uFEFF/, ''));
+  if (!rawHeader) throw Error('Tệp chưa có tiêu đề cột.');
+  const emptyColumns=rawHeader.flatMap((name,i)=>name ? [] : [i]);
+  if (rawRows.some(row=>emptyColumns.some(i=>row[i]))) throw Error('Có cột chưa đặt tên nhưng chứa dữ liệu. Hãy bổ sung tiêu đề cột đó.');
+  if (rawRows.some(row=>row.length>rawHeader.length && row.slice(rawHeader.length).some(Boolean))) throw Error('Có dữ liệu nằm ngoài các cột đã đặt tên.');
+  const keep=rawHeader.flatMap((name,i)=>name ? [i] : []);
+  const header=keep.map(i=>rawHeader[i]);
+  const rows=rawRows.map(row=>keep.map(i=>row[i]??''));
+  if (!header || new Set(header).size!==header.length || originalColumns.some(column=>!header.includes(column))
+      || header.some(column=>!new Set<string>(directoryColumns).has(column))) {
+    throw Error('Tiêu đề cột chưa đúng hoặc bị trùng. Giữ các cột bắt buộc và dùng tên cột trong CSV mẫu.');
   }
-  if (!rows.length || rows.length > maxRows) throw Error('Mỗi tệp cần từ 1 đến 500 hồ sơ.');
+  if (!rows.length || rows.length > directoryMaxRows) throw Error('Mỗi tệp cần từ 1 đến 10.000 hồ sơ.');
   return rows.map((row, index) => {
-    const [name, trade, province, taxCode, website, sourceUrl] = row;
-    const profile = Object.fromEntries(profileFields.map(([key],offset)=>[key,row[offset+6] ?? '']).filter(([,value])=>value));
+    const cell=(column:string)=>row[header.indexOf(column)] ?? '';
+    const [name, trade, rawProvince, taxCode, website, sourceUrl] = originalColumns.map(cell);
+    const province=currentProvince(rawProvince);
+    const profile = Object.fromEntries(profileFields.map(([key,column])=>[key,cell(column)]).filter(([,value])=>value));
     const invalidProfile = profileFields.some(([key,,,max])=>(profile[key]?.length ?? 0)>max)
       || (profile.year && (!/^\d{4}$/.test(profile.year) || Number(profile.year)<1800 || Number(profile.year)>new Date().getFullYear()))
-      || (profile.phone && !/^\+?[0-9][0-9 .()-]{5,39}$/.test(profile.phone))
+      || (profile.phone && !/^(?:\+?[0-9]|\([0-9])[0-9 .()-]{5,39}$/.test(profile.phone))
+      || (profile.hotline && !/^(?:\+?[0-9]|\([0-9])[0-9 .()-]{5,39}$/.test(profile.hotline))
       || (profile.email && !/^[a-z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(profile.email))
-      || (profile.zalo && !/^https:\/\/(?:zalo\.me|oa\.zalo\.me)\/[a-z0-9_./-]+$/i.test(profile.zalo));
-    const invalid = row.length !== columns.length || !name || name.length > 200 || !trade || trade.length > 200
+      || (profile.zalo && profile.zalo.split(';').some((link:string)=>!/^https:\/\/(?:zalo\.me|oa\.zalo\.me)\/[a-z0-9_./-]+$/i.test(link.trim())));
+    const invalid = row.length !== header.length || !name || name.length > 200 || !trade || trade.length > 1000
       || !provinceOptions.includes(province) || (taxCode && !/^\d{10}(-\d{3})?$/.test(taxCode))
       || (website && !webUrl(website)) || !webUrl(sourceUrl) || row.some(cell => /[\u0000-\u001f\u007f]/.test(cell));
+    if (taxCode && !/^\d{10}(-\d{3})?$/.test(taxCode)) return {row:index+1,error:
+      /^\d{9}$/.test(taxCode) ? 'Mã số thuế chỉ có 9 chữ số, có thể đã mất số 0 đầu khi lưu bằng Excel. Đối chiếu nguồn và lưu cột mã số thuế dạng văn bản.' : 'Mã số thuế cần đủ 10 chữ số hoặc dạng 10 chữ số-3 chữ số chi nhánh.'} as const;
     if (invalid || invalidProfile) return { row: index + 1, error: invalid ? 'Kiểm tra tên, chuyên môn, tỉnh/thành, mã số thuế và URL nguồn.' : 'Kiểm tra độ dài, năm thành lập hoặc thông tin liên hệ.' } as const;
     return { row: index + 1, company: {
       name, trade, province, taxCode: taxCode || null, website: website || null, sourceUrl, profile,
