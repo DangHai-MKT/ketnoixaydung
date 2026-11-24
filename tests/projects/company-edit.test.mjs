@@ -37,3 +37,11 @@ test('Version detects concurrent content edits but is independent of JSON key or
   assert.equal(companyEditVersion(initial),companyEditVersion({...initial,profile:Object.fromEntries(Object.entries(initial.profile).reverse())}));
   assert.notEqual(companyEditVersion(initial),companyEditVersion({...initial,name:'Doanh nghiệp B'}));
 });
+
+
+test('Correcting imported data clears the persistent supplement warning',()=>{
+  const previous={...initial,profile:{...initial.profile,importStatus:'needs_supplement',importWarnings:'["Chuyên môn đang để trống."]'}};
+  const result=mergeEditedProfile(previous,parseCompanyEdit(form()));
+  assert.equal(result.importStatus,undefined);assert.equal(result.importWarnings,undefined);
+  assert.equal(result.addressOriginal,initial.profile.addressOriginal);
+});

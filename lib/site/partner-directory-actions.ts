@@ -1,6 +1,6 @@
 'use server';
 
-import {and,eq,isNull,isNotNull,inArray} from 'drizzle-orm';
+import {and,eq,isNull,isNotNull,inArray,sql} from 'drizzle-orm';
 import {revalidatePath} from 'next/cache';
 import {db} from '../../db/client';
 import {partnerCompanies,auditLogs} from '../../db/schema';
@@ -50,7 +50,7 @@ export async function bulkCompanyPublication(_state:{message:string;ok:boolean},
   try {
     changed=await db.transaction(async tx=>{
       const result=await tx.update(partnerCompanies).set({publishedAt:published?new Date():null})
-        .where(and(inArray(partnerCompanies.id,ids),published?isNull(partnerCompanies.publishedAt):isNotNull(partnerCompanies.publishedAt)))
+        .where(and(inArray(partnerCompanies.id,ids),published?sql`coalesce(${partnerCompanies.profile}->>'importStatus','')<>'needs_supplement'`:undefined,published?isNull(partnerCompanies.publishedAt):isNotNull(partnerCompanies.publishedAt)))
         .returning({id:partnerCompanies.id});
       if(result.length)await tx.insert(auditLogs).values(result.map(row=>({actorId:actor.id,entityType:'partner_company',entityId:row.id,
         action:published?'company.published':'company.hidden',reason:'Quản lý danh bạ theo nhóm đã chọn',metadata:{batchSize:ids.length}})));
@@ -59,7 +59,7 @@ export async function bulkCompanyPublication(_state:{message:string;ok:boolean},
   }catch{return {ok:false,message:'Chưa cập nhật được hồ sơ. Không có thay đổi nào được lưu; vui lòng thử lại.'};}
   revalidatePath('/admin/partner-directory');revalidatePath('/find-partners');revalidatePath('/find-partners/companies');
   for(const row of changed){revalidatePath(companyPath(row.id));revalidatePath('/admin/partner-directory/'+row.id);}
-  return {ok:true,message:`Đã ${published?'công khai':'ẩn'} ${changed.length} hồ sơ. ${ids.length-changed.length} hồ sơ không cần thay đổi hoặc không còn tồn tại.`};
+  return {ok:true,message:`Đã ${published?'công khai':'ẩn'} ${changed.length} hồ sơ. ${ids.length-changed.length} hồ sơ không thay đổi, cần bổ sung thông tin hoặc không còn tồn tại.`};
 }
 
 export async function setCompanyPublication(id:string, published:boolean, form:FormData) {

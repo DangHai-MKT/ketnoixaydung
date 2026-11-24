@@ -20,6 +20,7 @@ export default function CompanyDirectoryEditor({id,initial,version,published,bac
   const profileInput=(key:string)=>{const field=profileFields.find(f=>f[0]===key)!;return input(key,field[2],field[3],key==='email'?'email':['phone','hotline'].includes(key)?'tel':'text');};
   return <form action={submit} className="directory-edit-form partner-form" id="sua-ho-so">
     <input type="hidden" name="version" value={result.version??version}/>
+    {initial.profile.importWarnings&&!result.ok&&<aside className="partner-card" role="status"><h2>Cần bổ sung thông tin</h2><p>Hồ sơ đã được nhập và giữ nguyên dữ liệu. Kiểm tra các mục sau trước khi công khai:</p><p>{initial.profile.importWarnings.replace(/^\[|\]$/g,'').replaceAll('\",\"',' · ').replaceAll('\"','')}</p></aside>}
     <fieldset disabled={pending}>
       <section className="partner-card directory-edit-section"><p className="company-section-number">01 · THÔNG TIN CHÍNH</p><h2>Sửa hồ sơ doanh nghiệp</h2>
         <p className="directory-edit-intro">Bổ sung thông tin bạn đã đối chiếu. Các mục có dấu * là bắt buộc.</p>
@@ -29,7 +30,7 @@ export default function CompanyDirectoryEditor({id,initial,version,published,bac
       </section>
       <section className="partner-card directory-edit-section"><p className="company-section-number">02 · ĐỊA BÀN</p><h2>Địa chỉ doanh nghiệp</h2>
         <div className="directory-edit-grid"><label>Tỉnh / thành *<select name="province" value={fields.province} required
-          onChange={e=>setFields(old=>({...old,province:e.target.value,ward:''}))}>{provinceOptions.map(p=><option key={p}>{p}</option>)}</select></label>
+          onChange={e=>setFields(old=>({...old,province:e.target.value,ward:''}))}><option value="">Chọn tỉnh / thành</option>{fields.province&&!provinceOptions.includes(fields.province)&&<option value={fields.province}>{fields.province} (cần đối chiếu)</option>}{provinceOptions.map(p=><option key={p}>{p}</option>)}</select></label>
           <div><ProjectWardPicker key={fields.province} label="Phường / xã" value={fields.ward}
             options={Object.hasOwn(wards,fields.province)?wards[fields.province]:[]} onChange={value=>change('ward',value)}/><input type="hidden" name="ward" value={fields.ward}/></div></div>
         {profileInput('address')}

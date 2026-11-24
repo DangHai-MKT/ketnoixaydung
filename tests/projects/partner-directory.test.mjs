@@ -163,3 +163,16 @@ test('Identifies truly incomplete records and corrupt phone data by field',()=>{
   }
   assert.match(parsePartnerDirectory(header+'\nCông ty A,Thi công,Phnom Penh,,,https://example.com,0901234567')[0].error,/Tỉnh\/thành/);
 });
+
+
+test('Incomplete import retains every row and original invalid fields with persistent warnings',()=>{
+  const csv=directoryColumns.join(',')+'\n'+directoryColumns.map(key=>({ten_cong_ty:'Công ty cần bổ sung',chuyen_mon:'',tinh_thanh:'Phnom Penh',dien_thoai:"986685538’0",nguon_url:'https://example.com/source'}[key]??'')).join(',');
+  assert.equal(parsePartnerDirectory(csv)[0].company,undefined);
+  const [row]=parsePartnerDirectory(csv,{allowIncomplete:true});
+  assert.equal(row.company.name,'Công ty cần bổ sung');
+  assert.equal(row.company.trade,'');
+  assert.equal(row.company.province,'Phnom Penh');
+  assert.equal(row.company.profile.phone,'986685538’0');
+  assert.equal(row.company.profile.importStatus,'needs_supplement');
+  assert.equal(JSON.parse(row.company.profile.importWarnings).length,3);
+});

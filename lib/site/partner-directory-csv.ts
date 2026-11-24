@@ -59,7 +59,7 @@ function webUrl(value: string) {
   } catch { return false; }
 }
 
-export function parsePartnerDirectory(text: string) {
+export function parsePartnerDirectory(text: string, options: {allowIncomplete?:boolean} = {}) {
   if (new TextEncoder().encode(text).length > directoryMaxBytes) throw Error('Tệp vượt quá 10 MB.');
   const [rawHeader, ...rawRows] = parseRows(text.replace(/^\uFEFF/, ''));
   if (!rawHeader) throw Error('Tệp chưa có tiêu đề cột.');
@@ -78,7 +78,7 @@ export function parsePartnerDirectory(text: string) {
     const cell=(column:string)=>row[header.indexOf(column)] ?? '';
     const [name, trade, rawProvince, taxCode, website, sourceUrl] = originalColumns.map(cell);
     const province=currentProvince(rawProvince);
-    const profile = Object.fromEntries(profileFields.map(([key,column])=>[key,cell(column)]).filter(([,value])=>value));
+    const profile:Record<string,string> = Object.fromEntries(profileFields.map(([key,column])=>[key,cell(column)]).filter(([,value])=>value));
     const errors:string[]=[];
     if(!name)errors.push('Tên công ty đang để trống.');else if(name.length>200)errors.push('Tên công ty vượt quá 200 ký tự.');
     if(!trade)errors.push('Chuyên môn đang để trống.');else if(trade.length>1000)errors.push('Chuyên môn vượt quá 1.000 ký tự.');
@@ -98,10 +98,17 @@ export function parsePartnerDirectory(text: string) {
     }
     if(profile.email&&!/^[a-z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(profile.email))errors.push('Email doanh nghiệp chưa hợp lệ.');
     if(profile.zalo&&profile.zalo.split(';').some((link:string)=>!/^https:\/\/(?:zalo\.me|oa\.zalo\.me)\/[a-z0-9_./-]+$/i.test(link.trim())))errors.push('Liên kết Zalo chưa hợp lệ. Dùng https://zalo.me/… và phân tách nhiều liên kết bằng dấu chấm phẩy.');
-    if(errors.length)return {row:index+1,error:errors.join(' ')} as const;
-    return { row: index + 1, company: {
-      name, trade, province, taxCode: taxCode || null, website: website || null, sourceUrl, profile,
-      identityKey: JSON.stringify([name.normalize('NFKC').toLocaleLowerCase('vi').replace(/\s+/g, ' '), province]),
+    if(errors.length&&!options.allowIncomplete)return {row:index+1,error:errors.join(' ')} as const;
+    if(errors.length) {
+      profile.importStatus='needs_supplement';
+      profile.importWarnings=JSON.stringify(errors);
+    }
+    // PostgreSQL text cannot store NUL; keep its original escaped representation for review.
+    if(row.some(value=>value.includes('\u0000')))profile.importOriginalRow=JSON.stringify(Object.fromEntries(header.map((key,i)=>[key,row[i]])));
+    const clean=(value:string)=>value.replaceAll('\u0000','');
+    return { row: index + 1, error:errors.length?errors.join(' '):undefined, company: {
+      name:clean(name), trade:clean(trade), province:clean(province), taxCode:clean(taxCode) || null, website:clean(website) || null, sourceUrl:clean(sourceUrl), profile:Object.fromEntries(Object.entries(profile).map(([k,v])=>[k,clean(v)])),
+      identityKey: JSON.stringify([name ? name.normalize('NFKC').toLocaleLowerCase('vi').replace(/\s+/g, ' ') : sourceUrl || JSON.stringify(row), province]),
     } } as const;
   });
 }

@@ -11,12 +11,11 @@ export default function PartnerDirectoryImport() {
   const [error,setError]=useState('');
   const [notice,setNotice]=useState('');
   const [busy,setBusy]=useState(false);
-  const [skipInvalid,setSkipInvalid]=useState(false);
   const errors=rows.filter(row=>row.error);
 
   async function preview(event:ChangeEvent<HTMLInputElement>) {
     const file=event.target.files?.[0];
-    setText('');setRows([]);setError('');setNotice('');setSkipInvalid(false);
+    setText('');setRows([]);setError('');setNotice('');
     if (!file) return;
     setBusy(true);
     try {
@@ -32,14 +31,14 @@ export default function PartnerDirectoryImport() {
   }
 
   async function confirm() {
-    if (busy || !text || (errors.length&&!skipInvalid) || rows.length===errors.length) return;
+    if (busy || !text) return;
     setBusy(true);setError('');
     try {
-      const response=await fetch('/api/admin/partner-directory',{method:'POST',headers:{'Content-Type':'text/csv;charset=utf-8',...(skipInvalid?{'X-Skip-Invalid':'1'}:{})},body:text});
+      const response=await fetch('/api/admin/partner-directory',{method:'POST',headers:{'Content-Type':'text/csv;charset=utf-8'},body:text});
       const result=await response.json();
       if(!response.ok) throw Error(result.error || 'Chưa nhập được danh bạ.');
-      setNotice(`Đã nhập ${result.inserted} hồ sơ mới. Bỏ qua ${result.skipped} hồ sơ trùng.`+(result.invalid?` ${result.invalid} hồ sơ lỗi chưa được nhập; hãy sửa các dòng được liệt kê rồi chọn lại tệp.`:''));
-      setText('');setRows(skipInvalid?errors:[]);setSkipInvalid(false);router.refresh();
+      setNotice(`Đã nhập ${result.inserted} hồ sơ mới. Bỏ qua ${result.skipped} hồ sơ trùng.`+(result.needsSupplement?` Tệp có ${result.needsSupplement} hồ sơ cần bổ sung; cảnh báo được lưu trên từng hồ sơ. Mở bộ lọc Cần bổ sung để xử lý sau.`:''));
+      setText('');setRows([]);router.refresh();
     } catch(cause) {setError((cause as Error).message);}
     finally {setBusy(false);}
   }
@@ -48,14 +47,13 @@ export default function PartnerDirectoryImport() {
     <a href="/mau-ho-so-doanh-nghiep.csv" download>Tải CSV mẫu</a>
     <p>Tối đa 10 MB và 10.000 hồ sơ mỗi tệp CSV UTF-8.</p>
     <label>Chọn CSV UTF-8<input type="file" accept=".csv,text/csv" onChange={preview}/></label>
-    {rows.length>0 && <p>{rows.length} hồ sơ · {errors.length} lỗi. Bản ghi trùng sẽ được bỏ qua khi nhập.</p>}
+    {rows.length>0 && <p>{rows.length} hồ sơ · {errors.length} hồ sơ cần bổ sung. Bản ghi trùng sẽ được bỏ qua khi nhập.</p>}
     {rows.length>0 && <p role="status">Đã đổi địa chỉ: {rows.filter(r=>r.company?.profile.addressStatus==='converted').length} ·
       Cần kiểm tra phường/xã: {rows.filter(r=>r.company?.profile.addressStatus==='review').length}.
       Địa chỉ chưa rõ sẽ được giữ nguyên và lưu hồ sơ với phường/xã để trống.</p>}
     {errors.length>0 && <ul>{errors.slice(0,50).map(row=><li key={row.row}>Hồ sơ {row.row}: {row.error}</li>)}</ul>}
-    {text&&errors.length>0&&rows.length>errors.length&&<label className="directory-skip-invalid"><input type="checkbox" checked={skipInvalid} onChange={event=>setSkipInvalid(event.target.checked)}/>
-      Nhập trước {rows.length-errors.length} hồ sơ hợp lệ. {errors.length} hồ sơ lỗi sẽ chưa được nhập.</label>}
-    {errors.length>50&&<p>Đang hiển thị 50 / {errors.length} lỗi đầu tiên. Hãy sửa các lỗi này rồi chọn lại tệp.</p>}
+    {text&&errors.length>0&&<p className="directory-skip-invalid" role="status">Vẫn nhập toàn bộ hồ sơ ở trạng thái Nội bộ. Thông tin gốc và cảnh báo được lưu để bổ sung sau.</p>}
+    {errors.length>50&&<p>Đang hiển thị 50 / {errors.length} lỗi đầu tiên. Các cảnh báo còn lại cũng được lưu trên từng hồ sơ.</p>}
     {rows.length>0 && <ul className="partner-items">{rows.filter(row=>row.company).slice(0,5).map(row=>
       <li key={row.row}><strong>{row.company?.name}</strong><small>{row.company?.trade} · {row.company?.province}</small>
         <p>{row.company?.profile.address}</p>
@@ -67,8 +65,8 @@ export default function PartnerDirectoryImport() {
         <p>{row.company?.profile.address}</p><small>Phường/xã: {row.company?.profile.ward || 'Cần kiểm tra'} · {row.company?.profile.addressNote}</small></li>)}
     </ul></details>}
     {rows.length>50&&<p>Chỉ hiển thị trước tối đa 50 hồ sơ. Toàn bộ {rows.length} hồ sơ đã được kiểm tra và sẽ được xử lý khi xác nhận nhập.</p>}
-    <button type="button" className="button button-primary" disabled={!text || rows.length===errors.length || (!!errors.length&&!skipInvalid) || busy} onClick={confirm}>
-      {busy?'Đang xử lý…':skipInvalid?`Nhập ${rows.length-errors.length} hồ sơ hợp lệ`:'Xác nhận nhập'}
+    <button type="button" className="button button-primary" disabled={!text || busy} onClick={confirm}>
+      {busy?'Đang xử lý…':`Nhập toàn bộ ${rows.length} hồ sơ`}
     </button>
   </fieldset>
   {error && <p role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}</div>;

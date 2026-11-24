@@ -26,6 +26,7 @@ export function parseCompanyEdit(form:FormData) {
 export function mergeEditedProfile(previous:CompanyEditData,edited:ReturnType<typeof parseCompanyEdit>) {
   const locationChanged=previous.province!==edited.province||previous.profile.address!==edited.profile.address||previous.profile.ward!==edited.profile.ward;
   const profile={...previous.profile,...edited.profile};
+  delete profile.importStatus;delete profile.importWarnings;
   if(!locationChanged)return profile;
   profile.addressOriginal=previous.profile.addressOriginal||previous.profile.address||edited.profile.address||'';
   if(edited.profile.ward) {

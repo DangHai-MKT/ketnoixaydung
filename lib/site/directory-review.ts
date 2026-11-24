@@ -1,6 +1,6 @@
-export type DirectoryAdminRow={id:string;name:string;trade:string;province:string;ward:string;hasContact:boolean;addressStatus:string;published:boolean};
-export function directoryIssues(row:Pick<DirectoryAdminRow,'ward'|'hasContact'|'addressStatus'>) {
-  return [...(!row.hasContact?['Thiếu liên hệ']:[]),...(!row.ward||row.addressStatus==='review'?['Kiểm tra địa chỉ']:[])];
+export type DirectoryAdminRow={id:string;name:string;trade:string;province:string;ward:string;hasContact:boolean;addressStatus:string;needsSupplement?:boolean;published:boolean};
+export function directoryIssues(row:Pick<DirectoryAdminRow,'ward'|'hasContact'|'addressStatus'|'needsSupplement'>) {
+  return [...(row.needsSupplement?['Cần bổ sung']:[]),...(!row.hasContact?['Thiếu liên hệ']:[]),...(!row.ward||row.addressStatus==='review'?['Kiểm tra địa chỉ']:[])];
 }
 export function directorySelection(values:FormDataEntryValue[]) {
   const ids=[...new Set(values)];

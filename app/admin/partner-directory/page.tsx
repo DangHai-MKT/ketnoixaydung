@@ -17,14 +17,15 @@ export default async function Page({searchParams}:{searchParams:Promise<Query>})
   const keyword=typeof params.q==='string'?params.q.trim().slice(0,100):'';
   const province=typeof params.province==='string'&&provinceOptions.includes(params.province)?params.province:'';
   const status=['public','internal'].includes(params.status??'')?params.status:'';
-  const quality=['review','ready','contact'].includes(params.quality??'')?params.quality:'';
+  const quality=['review','ready','contact','supplement'].includes(params.quality??'')?params.quality:'';
   const size=['20','50','100'].includes(params.size??'')?Number(params.size):50;
   const hasContact=sql<boolean>`(coalesce(${companies.profile}->>'phone','')<>'' OR coalesce(${companies.profile}->>'hotline','')<>'' OR coalesce(${companies.profile}->>'email','')<>'' OR coalesce(${companies.profile}->>'zalo','')<>'')`;
-  const review=sql<boolean>`(NOT ${hasContact} OR coalesce(${companies.profile}->>'ward','')='' OR coalesce(${companies.profile}->>'addressStatus','')='review')`;
+  const needsSupplement=sql<boolean>`coalesce(${companies.profile}->>'importStatus','')='needs_supplement'`;
+  const review=sql<boolean>`(${needsSupplement} OR NOT ${hasContact} OR coalesce(${companies.profile}->>'ward','')='' OR coalesce(${companies.profile}->>'addressStatus','')='review')`;
   const pattern='%'+keyword.replace(/[\\%_]/g,'\\$&')+'%';
   const where=and(keyword?or(ilike(companies.name,pattern),ilike(companies.trade,pattern),ilike(companies.taxCode,pattern)):undefined,
     province?eq(companies.province,province):undefined,status==='public'?isNotNull(companies.publishedAt):status==='internal'?isNull(companies.publishedAt):undefined,
-    quality==='review'?review:quality==='ready'?sql`NOT ${review}`:quality==='contact'?sql`NOT ${hasContact}`:undefined);
+    quality==='supplement'?needsSupplement:quality==='review'?review:quality==='ready'?sql`NOT ${review}`:quality==='contact'?sql`NOT ${hasContact}`:undefined);
   const totals=await Promise.all([
     db.select({total:sql<number>`count(*)::int`,published:sql<number>`count(*) FILTER (WHERE ${companies.publishedAt} IS NOT NULL)::int`,
       review:sql<number>`count(*) FILTER (WHERE ${review})::int`}).from(companies),
@@ -35,7 +36,7 @@ export default async function Page({searchParams}:{searchParams:Promise<Query>})
   const pages=Math.max(1,Math.ceil(matched/size)),page=Math.min(rawPage,pages);
   const rows=await db.select({id:companies.id,name:companies.name,trade:companies.trade,province:companies.province,
     ward:sql<string>`coalesce(${companies.profile}->>'ward','')`,addressStatus:sql<string>`coalesce(${companies.profile}->>'addressStatus','')`,
-    hasContact,published:sql<boolean>`${companies.publishedAt} IS NOT NULL`}).from(companies).where(where)
+    hasContact,needsSupplement,published:sql<boolean>`${companies.publishedAt} IS NOT NULL`}).from(companies).where(where)
     .orderBy(desc(companies.createdAt),desc(companies.id)).limit(size).offset((page-1)*size);
   const filters={q:keyword,province,status:status??'',quality:quality??'',size:String(size)};
   const pageHref=(next:number)=>'/admin/partner-directory?'+new URLSearchParams({...filters,page:String(next)});
@@ -49,7 +50,7 @@ export default async function Page({searchParams}:{searchParams:Promise<Query>})
       <Link href="/admin/partner-directory"><span>Tất cả doanh nghiệp</span><strong>{number(total.total)}</strong><small>Hồ sơ trong danh bạ</small></Link>
       <Link href="/admin/partner-directory?status=public"><span>Đang công khai</span><strong>{number(total.published)}</strong><small>Khách hàng có thể tìm thấy</small></Link>
       <Link href="/admin/partner-directory?status=internal"><span>Chưa công khai</span><strong>{number(total.total-total.published)}</strong><small>Hồ sơ nội bộ</small></Link>
-      <Link className="needs-review" href="/admin/partner-directory?quality=review"><span>Cần kiểm tra thông tin</span><strong>{number(total.review)}</strong><small>Thiếu liên hệ hoặc địa chỉ chưa rõ</small></Link>
+      <Link className="needs-review" href="/admin/partner-directory?quality=review"><span>Cần kiểm tra thông tin</span><strong>{number(total.review)}</strong><small>Cần bổ sung, thiếu liên hệ hoặc địa chỉ chưa rõ</small></Link>
     </div>
     <details open={params.import==='1'} id="nhap-doanh-nghiep" className="directory-import-panel"><summary>Nhập doanh nghiệp <span>CSV hàng loạt hoặc một hồ sơ Trang Vàng</span></summary>
       <div className="directory-import-grid"><section><h2>Nhập danh sách từ CSV</h2><p>Tối đa 10 MB và 10.000 hồ sơ / tệp. Bỏ qua hồ sơ trùng, tự đối chiếu phường/xã. Hồ sơ mới được lưu nội bộ để bạn kiểm tra trước khi công khai.</p><PartnerDirectoryImport/></section>
@@ -60,7 +61,7 @@ export default async function Page({searchParams}:{searchParams:Promise<Query>})
         <label className="directory-keyword">Tìm doanh nghiệp<input name="q" defaultValue={keyword} maxLength={100} placeholder="Tên công ty, mã số thuế, chuyên môn…"/></label>
         <label>Tỉnh / thành<select name="province" defaultValue={province}><option value="">Tất cả địa bàn</option>{provinceOptions.map(p=><option key={p}>{p}</option>)}</select></label>
         <label>Hiển thị<select name="status" defaultValue={status}><option value="">Tất cả trạng thái</option><option value="internal">Nội bộ</option><option value="public">Công khai</option></select></label>
-        <label>Thông tin cần xử lý<select name="quality" defaultValue={quality}><option value="">Tất cả hồ sơ</option><option value="review">Cần kiểm tra</option><option value="contact">Thiếu liên hệ</option><option value="ready">Đủ thông tin cơ bản</option></select></label>
+        <label>Thông tin cần xử lý<select name="quality" defaultValue={quality}><option value="">Tất cả hồ sơ</option><option value="review">Cần kiểm tra</option><option value="supplement">Cần bổ sung sau nhập</option><option value="contact">Thiếu liên hệ</option><option value="ready">Đủ thông tin cơ bản</option></select></label>
         <label>Số dòng<select name="size" defaultValue={String(size)}>{[20,50,100].map(n=><option key={n} value={n}>{n} / trang</option>)}</select></label>
         <button className="button button-primary" type="submit">Lọc danh sách</button>
       </form>

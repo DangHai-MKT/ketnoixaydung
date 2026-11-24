@@ -14,13 +14,12 @@ export async function POST(request: Request) {
     const actor = await requireApiActor(request, partnerStaff);
     const bytes = await readBoundedBody(request, directoryMaxBytes);
     let rows;
-    try { rows = parsePartnerDirectory(new TextDecoder('utf-8', {fatal:true}).decode(bytes)); }
+    try { rows = parsePartnerDirectory(new TextDecoder('utf-8', {fatal:true}).decode(bytes), {allowIncomplete:true}); }
     catch (error) { throw new AccessError(400, error instanceof TypeError ? 'Hãy lưu tệp dưới dạng CSV UTF-8.' : (error as Error).message); }
     rows=rows.map(row=>row.company ? {...row,company:enrichCompanyAddress(row.company)} : row);
     if (request.headers.get('x-preview-only')==='1') return privateJson({rows});
     const companies = rows.flatMap(row => row.company ? [{...row.company, importedBy:actor.id}] : []);
-    const invalid=rows.length-companies.length;
-    if (invalid && request.headers.get('x-skip-invalid')!=='1') throw new AccessError(400, 'Sửa các dòng lỗi hoặc chọn nhập trước hồ sơ hợp lệ.');
+    const needsSupplement=rows.filter(row=>row.error).length;
     if (!companies.length) throw new AccessError(400, 'Không có hồ sơ hợp lệ để nhập.');
     const result=await db.transaction(async tx=>{
       // Bound SQL parameters for large files; the transaction keeps the file atomic.
@@ -37,7 +36,7 @@ export async function POST(request: Request) {
             isNull(partnerCompanies.publishedAt))).returning({id:partnerCompanies.id});
         updated=matches.length;
       }
-      return {inserted:insertedCount,updated,skipped:companies.length-insertedCount-updated,invalid};
+      return {inserted:insertedCount,updated,skipped:companies.length-insertedCount-updated,needsSupplement};
     });
     return privateJson(result);
   } catch (error) { return accessErrorResponse(error); }
