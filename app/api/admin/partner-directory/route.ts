@@ -19,7 +19,9 @@ export async function POST(request: Request) {
     rows=rows.map(row=>row.company ? {...row,company:enrichCompanyAddress(row.company)} : row);
     if (request.headers.get('x-preview-only')==='1') return privateJson({rows});
     const companies = rows.flatMap(row => row.company ? [{...row.company, importedBy:actor.id}] : []);
-    if (companies.length !== rows.length) throw new AccessError(400, 'Sửa các dòng lỗi trước khi nhập.');
+    const invalid=rows.length-companies.length;
+    if (invalid && request.headers.get('x-skip-invalid')!=='1') throw new AccessError(400, 'Sửa các dòng lỗi hoặc chọn nhập trước hồ sơ hợp lệ.');
+    if (!companies.length) throw new AccessError(400, 'Không có hồ sơ hợp lệ để nhập.');
     const result=await db.transaction(async tx=>{
       // Bound SQL parameters for large files; the transaction keeps the file atomic.
       let insertedCount=0;
@@ -35,7 +37,7 @@ export async function POST(request: Request) {
             isNull(partnerCompanies.publishedAt))).returning({id:partnerCompanies.id});
         updated=matches.length;
       }
-      return {inserted:insertedCount,updated,skipped:rows.length-insertedCount-updated};
+      return {inserted:insertedCount,updated,skipped:companies.length-insertedCount-updated,invalid};
     });
     return privateJson(result);
   } catch (error) { return accessErrorResponse(error); }

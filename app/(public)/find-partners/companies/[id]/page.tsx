@@ -11,6 +11,7 @@ import {unlockCompanyContact} from '../../../../../lib/site/company-contact-acti
 import {PartnerRequestForm} from '../../../../../components/PartnerRequestForm';
 import Icon from '../../../../../components/MarketplaceIcon';
 import {partnerSchemaUnavailable} from '../../../../../services/partner-requests';
+import {companyPhones} from '../../../../../lib/site/company-phones';
 
 export const dynamic='force-dynamic';
 type Props={params:Promise<{id:string}>;searchParams:Promise<{q?:string;province?:string;ward?:string;page?:string}>};
@@ -73,8 +74,8 @@ export default async function Page({params,searchParams}:Props) {
         {access ? <><p className="company-access-badge">Bạn đã mở liên hệ · Xem lại miễn phí</p>
           <dl className="company-contact-facts">{[['Người phụ trách',profile.contactPerson],['Địa chỉ',profile.address],['Điện thoại',profile.phone],['Hotline',profile.hotline],['Email',profile.email]].map(([label,value])=>value&&<div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
           <div className="company-contact-buttons">
-            {profile.phone&&<a className="button button-primary" href={'tel:'+profile.phone.replace(/[^+0-9]/g,'')}>Gọi doanh nghiệp</a>}
-            {profile.hotline&&<a className="button button-secondary" href={'tel:'+profile.hotline.replace(/[^+0-9]/g,'')}>Gọi Hotline</a>}
+            {companyPhones(profile.phone).map(phone=><a key={phone} className="button button-primary" href={'tel:'+phone.replace(/[^+0-9]/g,'')}>Gọi {phone}</a>)}
+            {companyPhones(profile.hotline).map(phone=><a key={phone} className="button button-secondary" href={'tel:'+phone.replace(/[^+0-9]/g,'')}>Hotline {phone}</a>)}
             {profile.zalo?.split(';').map(s=>s.trim()).filter(Boolean).map((link,i)=><a className="button button-secondary" key={link} href={link} target="_blank" rel="noreferrer">Nhắn Zalo{profile.zalo!.includes(';')?' '+(i+1):''}</a>)}
             {profile.email&&<a className="button button-secondary" href={'mailto:'+encodeURIComponent(profile.email)}>Gửi email</a>}
           </div>

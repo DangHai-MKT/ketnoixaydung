@@ -369,3 +369,4 @@
 .directory-edit-grid .project-ward-picker summary { min-height:44px; }
 @media(max-width:620px) { .directory-edit-grid { grid-template-columns:1fr; } .directory-edit-save { padding:16px; bottom:8px; } .directory-edit-save > div { flex-basis:100%; } }
 .directory-detail-layout > aside .partner-form label { display:flex; align-items:flex-start; gap:9px; font-size:13px; line-height:1.7; }
+.partner-form label.directory-skip-invalid { display:flex; align-items:flex-start; gap:10px; padding:14px; background:#edf5ff; border:1px solid #cbdff4; border-radius:8px; font-size:13px; line-height:1.7; } .directory-skip-invalid input[type=checkbox] { width:18px; height:18px; min-height:18px; flex-shrink:0; margin-top:3px; }

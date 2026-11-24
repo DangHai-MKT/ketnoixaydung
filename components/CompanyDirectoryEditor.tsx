@@ -37,6 +37,7 @@ export default function CompanyDirectoryEditor({id,initial,version,published,bac
       </section>
       <section className="partner-card directory-edit-section"><p className="company-section-number">03 · LIÊN HỆ</p><h2>Đầu mối liên hệ</h2>
         <div className="directory-edit-grid">{['contactPerson','phone','hotline','email'].map(profileInput)}</div>
+        <p className="directory-edit-hint">Có thể nhập nhiều số điện thoại hoặc Hotline, cách nhau bằng dấu chấm phẩy. Ví dụ: 02438759567; 02439743556.</p>
         {profileInput('zalo')}<p className="directory-edit-hint">Dùng liên kết https://zalo.me/…; nhiều liên kết cách nhau bằng dấu chấm phẩy. Khách chỉ xem liên hệ sau khi mở quyền.</p>
       </section>
       <section className="partner-card directory-edit-section"><p className="company-section-number">04 · NĂNG LỰC</p><h2>Thông tin để khách đánh giá</h2>

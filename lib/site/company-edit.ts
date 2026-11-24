@@ -12,7 +12,7 @@ export function companyEditVersion(row:CompanyEditData) {
 export function parseCompanyEdit(form:FormData) {
   const read=(key:string)=>{const value=form.get(key);if(typeof value!=='string')throw Error('Biểu mẫu chưa đầy đủ. Hãy tải lại trang và thử lại.');return value.trim();};
   const core=['name','trade','province','taxCode','website','sourceUrl'].map(read);
-  const profile=Object.fromEntries(profileFields.map(([key])=>[key,read(key)]));
+  const profile:Record<string,string>=Object.fromEntries(profileFields.map(([key])=>[key,read(key)]));
   const values=[...core,...profileFields.map(([key])=>profile[key])];
   const cleaned=values.map((v,i)=>i>=6&&['work','experience'].includes(profileFields[i-6][0])?v.replace(/\r?\n/g,' '):v);
   const csv=directoryColumns.join(',')+'\n'+cleaned.map(value=>'"'+value.replaceAll('"','""')+'"').join(',');
@@ -20,6 +20,7 @@ export function parseCompanyEdit(form:FormData) {
   if(!row.company)throw Error(row.error);
   const province=row.company.province;
   if(profile.ward&&(!Object.hasOwn(wards,province)||!wards[province].includes(profile.ward)))throw Error('Chọn phường/xã thuộc tỉnh/thành của doanh nghiệp.');
+  profile.phone=row.company.profile.phone??'';profile.hotline=row.company.profile.hotline??'';
   return {...row.company,profile};
 }
 export function mergeEditedProfile(previous:CompanyEditData,edited:ReturnType<typeof parseCompanyEdit>) {

@@ -8,8 +8,9 @@ const moduleUrl = code => 'data:text/javascript;base64,'+Buffer.from(ts.transpil
   compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext},
 }).outputText).toString('base64');
 const locations = moduleUrl(await read('lib/projects/locations.ts'));
+const phones=moduleUrl(await read('lib/site/company-phones.ts'));
 const {parsePartnerDirectory,directoryColumns,directoryMaxBytes,directoryMaxRows} = await import(moduleUrl(
-  (await read('lib/site/partner-directory-csv.ts')).replace('../projects/locations',locations),
+  (await read('lib/site/partner-directory-csv.ts')).replace('../projects/locations',locations).replace('./company-phones',phones),
 ));
 const {listingUrl,extractYellowPages} = await import(moduleUrl(
   (await read('lib/site/yellow-pages.ts')).replace('../projects/locations',locations),
@@ -142,4 +143,23 @@ test('HTTP upload accepts exactly 10 MB and rejects an oversized streamed reques
   assert.equal((await readBoundedBody(exact,directoryMaxBytes)).length,directoryMaxBytes);
   const tooLarge=new Request('http://localhost/import',{method:'POST',body:new Uint8Array(directoryMaxBytes+1)});
   await assert.rejects(()=>readBoundedBody(tooLarge,directoryMaxBytes),e=>e.status===413);
+});
+
+test('Accepts multiple phone numbers without losing zeros or combining dial targets',async()=>{
+  const header='ten_cong_ty,chuyen_mon,tinh_thanh,ma_so_thue,website,nguon_url,dien_thoai,hotline';
+  const result=parsePartnerDirectory(header+'\nCông ty A,Thi công,Hà Nội,,,https://example.com,02438759567; 02439743556; 0901234567,19001000; 0912345678')[0];
+  assert.equal(result.company.profile.phone,'02438759567; 02439743556; 0901234567');
+  assert.equal(result.company.profile.hotline,'19001000; 0912345678');
+  const {companyPhones}=await import(phones);
+  assert.deepEqual(companyPhones(result.company.profile.phone),['02438759567','02439743556','0901234567']);
+});
+
+test('Identifies truly incomplete records and corrupt phone data by field',()=>{
+  const header='ten_cong_ty,chuyen_mon,tinh_thanh,ma_so_thue,website,nguon_url,dien_thoai';
+  const missing=parsePartnerDirectory(header+'\nCông ty A,,Hà Nội,,,https://example.com,0901234567')[0];
+  assert.match(missing.error,/Chuyên môn đang để trống/);
+  for(const number of ["986685538'0",'38346150919738040','855']) {
+    assert.match(parsePartnerDirectory(header+'\nCông ty A,Thi công,Hà Nội,,,https://example.com,'+number)[0].error,/Điện thoại doanh nghiệp/);
+  }
+  assert.match(parsePartnerDirectory(header+'\nCông ty A,Thi công,Phnom Penh,,,https://example.com,0901234567')[0].error,/Tỉnh\/thành/);
 });

@@ -1,9 +1,10 @@
 import { provinceOptions,projectProvinceFilterAliases } from '../projects/locations';
+import {companyPhones,validCompanyPhones} from './company-phones';
 
 export const profileFields = [
   ['address','dia_chi','Địa chỉ',400], ['year','nam_thanh_lap','Năm thành lập',4],
-  ['phone','dien_thoai','Điện thoại doanh nghiệp',40], ['email','email','Email doanh nghiệp',254],
-  ['hotline','hotline','Hotline',40], ['market','khu_vuc_nhan_viec','Khu vực nhận việc',200],
+  ['phone','dien_thoai','Điện thoại doanh nghiệp',500], ['email','email','Email doanh nghiệp',254],
+  ['hotline','hotline','Hotline',500], ['market','khu_vuc_nhan_viec','Khu vực nhận việc',200],
   ['work','loai_cong_trinh','Loại công trình',5000], ['experience','kinh_nghiem','Kinh nghiệm hoặc công trình tiêu biểu',10000],
   ['contactPerson','nguoi_phu_trach','Người phụ trách',150],
   ['employees','so_luong_nhan_vien','Số lượng nhân viên',100],
@@ -78,18 +79,26 @@ export function parsePartnerDirectory(text: string) {
     const [name, trade, rawProvince, taxCode, website, sourceUrl] = originalColumns.map(cell);
     const province=currentProvince(rawProvince);
     const profile = Object.fromEntries(profileFields.map(([key,column])=>[key,cell(column)]).filter(([,value])=>value));
-    const invalidProfile = profileFields.some(([key,,,max])=>(profile[key]?.length ?? 0)>max)
-      || (profile.year && (!/^\d{4}$/.test(profile.year) || Number(profile.year)<1800 || Number(profile.year)>new Date().getFullYear()))
-      || (profile.phone && !/^(?:\+?[0-9]|\([0-9])[0-9 .()-]{5,39}$/.test(profile.phone))
-      || (profile.hotline && !/^(?:\+?[0-9]|\([0-9])[0-9 .()-]{5,39}$/.test(profile.hotline))
-      || (profile.email && !/^[a-z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(profile.email))
-      || (profile.zalo && profile.zalo.split(';').some((link:string)=>!/^https:\/\/(?:zalo\.me|oa\.zalo\.me)\/[a-z0-9_./-]+$/i.test(link.trim())));
-    const invalid = row.length !== header.length || !name || name.length > 200 || !trade || trade.length > 1000
-      || !provinceOptions.includes(province) || (taxCode && !/^\d{10}(-\d{3})?$/.test(taxCode))
-      || (website && !webUrl(website)) || !webUrl(sourceUrl) || row.some(cell => /[\u0000-\u001f\u007f]/.test(cell));
-    if (taxCode && !/^\d{10}(-\d{3})?$/.test(taxCode)) return {row:index+1,error:
-      /^\d{9}$/.test(taxCode) ? 'Mã số thuế chỉ có 9 chữ số, có thể đã mất số 0 đầu khi lưu bằng Excel. Đối chiếu nguồn và lưu cột mã số thuế dạng văn bản.' : 'Mã số thuế cần đủ 10 chữ số hoặc dạng 10 chữ số-3 chữ số chi nhánh.'} as const;
-    if (invalid || invalidProfile) return { row: index + 1, error: invalid ? 'Kiểm tra tên, chuyên môn, tỉnh/thành, mã số thuế và URL nguồn.' : 'Kiểm tra độ dài, năm thành lập hoặc thông tin liên hệ.' } as const;
+    const errors:string[]=[];
+    if(!name)errors.push('Tên công ty đang để trống.');else if(name.length>200)errors.push('Tên công ty vượt quá 200 ký tự.');
+    if(!trade)errors.push('Chuyên môn đang để trống.');else if(trade.length>1000)errors.push('Chuyên môn vượt quá 1.000 ký tự.');
+    if(!provinceOptions.includes(province))errors.push('Tỉnh/thành chưa hợp lệ.');
+    if(taxCode&&!/^\d{10}(-\d{3})?$/.test(taxCode))errors.push(/^\d{9}$/.test(taxCode)
+      ?'Mã số thuế chỉ có 9 chữ số, có thể đã mất số 0 đầu khi lưu bằng Excel. Đối chiếu nguồn và lưu cột mã số thuế dạng văn bản.'
+      :'Mã số thuế cần đủ 10 chữ số hoặc dạng 10 chữ số-3 chữ số chi nhánh.');
+    if(website&&!webUrl(website))errors.push('Website cần là liên kết http:// hoặc https:// hợp lệ.');
+    if(!webUrl(sourceUrl))errors.push('URL nguồn đang trống hoặc chưa hợp lệ.');
+    if(row.length!==header.length)errors.push('Số cột chưa khớp với tiêu đề.');
+    if(row.some(cell=>/[\u0000-\u001f\u007f]/.test(cell)))errors.push('Có ký tự điều khiển không hợp lệ trong dữ liệu.');
+    for(const [key,,label,max] of profileFields)if((profile[key]?.length??0)>max)errors.push(`${label} vượt quá ${max.toLocaleString('vi-VN')} ký tự.`);
+    if(profile.year&&(!/^\d{4}$/.test(profile.year)||Number(profile.year)<1800||Number(profile.year)>new Date().getFullYear()))errors.push('Năm thành lập chưa hợp lệ.');
+    for(const [key,label] of [['phone','Điện thoại doanh nghiệp'],['hotline','Hotline']] as const) {
+      if(profile[key]&&!validCompanyPhones(profile[key]))errors.push(`${label} có số chưa hợp lệ. Dùng dấu chấm phẩy để phân tách các số (tối đa 20 số).`);
+      else if(profile[key])profile[key]=companyPhones(profile[key]).join('; ');
+    }
+    if(profile.email&&!/^[a-z0-9.!#$%&'*+\/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(profile.email))errors.push('Email doanh nghiệp chưa hợp lệ.');
+    if(profile.zalo&&profile.zalo.split(';').some((link:string)=>!/^https:\/\/(?:zalo\.me|oa\.zalo\.me)\/[a-z0-9_./-]+$/i.test(link.trim())))errors.push('Liên kết Zalo chưa hợp lệ. Dùng https://zalo.me/… và phân tách nhiều liên kết bằng dấu chấm phẩy.');
+    if(errors.length)return {row:index+1,error:errors.join(' ')} as const;
     return { row: index + 1, company: {
       name, trade, province, taxCode: taxCode || null, website: website || null, sourceUrl, profile,
       identityKey: JSON.stringify([name.normalize('NFKC').toLocaleLowerCase('vi').replace(/\s+/g, ' '), province]),
