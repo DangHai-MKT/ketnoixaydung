@@ -24,7 +24,9 @@ export function publicMetadata(path: string, title: string, description: string,
   const origin = publicOrigin();
   if (!origin) return {title, description, robots: privateRobots};
   const url = origin + path;
-  const images = [{url: origin + (image ?? shareImage), alt: image ? title : siteIdentity.tagline}];
+  let imageUrl=origin+shareImage;
+  if(image){try{const candidate=new URL(image,origin);if(candidate.protocol==='https:'&&!candidate.username&&!candidate.password)imageUrl=candidate.href;}catch{/* Keep the public brand image. */}}
+  const images = [{url:imageUrl, alt:imageUrl===origin+shareImage?siteIdentity.tagline:title}];
   const displayTitle = title === siteIdentity.name ? title : `${title} | ${siteIdentity.name}`;
   return {
     title: displayTitle, description, robots: {index: true, follow: true, googleBot: {index: true, follow: true, 'max-image-preview': 'large'}}, alternates: {canonical: url},

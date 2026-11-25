@@ -1,6 +1,6 @@
 import 'server-only';
 import {cache} from 'react';
-import {and,eq,isNotNull,asc} from 'drizzle-orm';
+import {and,eq,ne,isNotNull,asc,desc} from 'drizzle-orm';
 import {db} from '../db/client';
 import {partnerCompanies} from '../db/schema';
 import {partnerSchemaUnavailable} from './partner-requests';
@@ -16,5 +16,12 @@ export async function listCompanySitemapEntries(limit:number) {
   if(limit<=0)return [];
   return db.select({id:partnerCompanies.id,publishedAt:partnerCompanies.publishedAt}).from(partnerCompanies)
     .where(isNotNull(partnerCompanies.publishedAt)).orderBy(asc(partnerCompanies.id)).limit(limit)
+    .catch(error=>{if(partnerSchemaUnavailable(error))return [];throw error;});
+}
+
+export async function listRelatedCompanies(id:string,province:string) {
+  return db.select({id:partnerCompanies.id,name:partnerCompanies.name,trade:partnerCompanies.trade}).from(partnerCompanies)
+    .where(and(isNotNull(partnerCompanies.publishedAt),ne(partnerCompanies.id,id),eq(partnerCompanies.province,province)))
+    .orderBy(desc(partnerCompanies.publishedAt),asc(partnerCompanies.id)).limit(4)
     .catch(error=>{if(partnerSchemaUnavailable(error))return [];throw error;});
 }

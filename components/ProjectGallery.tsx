@@ -11,7 +11,7 @@ export default function ProjectGallery({images,title}:{images:Image[];title:stri
   return <div className="pd-gallery">
     <div className="pd-frame">
       {active&&failed!==active.url?<a href={active.url} target="_blank" rel="noopener noreferrer" aria-label={'Mở ảnh gốc: '+active.label}>
-        <img key={active.id} src={active.url} alt={title+' — '+active.label} onError={()=>setFailed(active.url)} decoding="async"/>
+        <img key={active.id} src={active.url} alt={title+' — '+active.label} onError={()=>setFailed(active.url)} loading="eager" fetchPriority="high" decoding="async"/>
         <span className="pd-zoom">Xem ảnh gốc ↗</span>
       </a>:<div className="pd-no-image"><Icon name="industrial" size={42}/><p>{active?'Không thể tải ảnh':'Dự án chưa có ảnh công khai'}</p></div>}
       {images.length>1&&<>

@@ -41,5 +41,10 @@ export default async function nextConfig(phase) {
     const { runDirectoryMigration } = await import('./scripts/apply-partner-directory.mjs');
     await runDirectoryMigration();
   }
-  return config;
+  return {
+    ...config,
+    // Complete metadata before sending HTML to crawlers and link-preview clients.
+    // Preserve the default limited-bot families and include Googlebot explicitly.
+    htmlLimitedBots: /bot|crawler|spider|google|bing|lighthouse|slurp|yandex|sogou|tumblr|vkShare|quora|ia_archiver|facebook|whatsapp|SkypeUriPreview|yeti/i,
+  };
 }

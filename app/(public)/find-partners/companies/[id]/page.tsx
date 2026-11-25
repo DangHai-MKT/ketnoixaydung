@@ -1,12 +1,13 @@
 import Link from 'next/link';
+import {companySeo} from '../../../../../lib/site/detail-seo';
 import {notFound} from 'next/navigation';
 import {and,eq} from 'drizzle-orm';
 import {db} from '../../../../../db/client';
 import {companyContactAccess} from '../../../../../db/schema';
-import {getPublishedCompany} from '../../../../../services/public-companies';
+import {getPublishedCompany,listRelatedCompanies} from '../../../../../services/public-companies';
 import {getCurrentActor} from '../../../../../lib/auth/server';
 import {companyPath,companySummary,companyResultsPath} from '../../../../../lib/site/company-display';
-import {publicMetadata,breadcrumbJson,privateRobots} from '../../../../../lib/site/seo';
+import {breadcrumbJson} from '../../../../../lib/site/seo';
 import {unlockCompanyContact} from '../../../../../lib/site/company-contact-actions';
 import {PartnerRequestForm} from '../../../../../components/PartnerRequestForm';
 import Icon from '../../../../../components/MarketplaceIcon';
@@ -18,9 +19,8 @@ type Props={params:Promise<{id:string}>;searchParams:Promise<{q?:string;province
 export async function generateMetadata({params}:Props) {
   const {id}=await params;
   const company=await getPublishedCompany(id);
-  if(!company)return {title:'Không tìm thấy doanh nghiệp',robots:privateRobots};
-  return publicMetadata(companyPath(id),company.name+' · Hồ sơ doanh nghiệp',
-    companySummary(company.trade,100)+' tại '+company.province+'. Xem năng lực, dịch vụ và mở thông tin liên hệ khi phù hợp.');
+  if(!company)notFound();
+  return companySeo({id:company.id,name:company.name,trade:company.trade,province:company.province,year:company.profile.year,market:company.profile.market,website:company.website,publishedAt:company.publishedAt}).metadata;
 }
 
 export default async function Page({params,searchParams}:Props) {
@@ -29,6 +29,8 @@ export default async function Page({params,searchParams}:Props) {
   if(!company)notFound();
   const {name,trade,province,profile,website,sourceUrl}=company;
   const path=companyPath(id);
+  const seo=companySeo({id,name,trade,province,year:profile.year,market:profile.market,website,publishedAt:company.publishedAt});
+  const related=await listRelatedCompanies(id,province);
   const contactAccess=actor?.status==='active' ? await db.select({id:companyContactAccess.companyId}).from(companyContactAccess)
     .where(and(eq(companyContactAccess.companyId,id),eq(companyContactAccess.buyerId,actor.id))).limit(1)
     .catch(error=>{if(partnerSchemaUnavailable(error))return null;throw error;}) : [];
@@ -38,6 +40,7 @@ export default async function Page({params,searchParams}:Props) {
   const back=companyResultsPath(query);
   const breadcrumb=breadcrumbJson([{label:'Trang chủ',path:'/'},{label:'Tìm đối tác',path:'/find-partners'},{label:name,path}]);
   return <main className="partner-page company-profile-page">
+    {seo.json&&<script type="application/ld+json" dangerouslySetInnerHTML={{__html:seo.json}}/>}
     {breadcrumb&&<script type="application/ld+json" dangerouslySetInnerHTML={{__html:breadcrumb}}/>}
     <nav className="partner-breadcrumb" aria-label="Đường dẫn"><Link href="/">Trang chủ</Link><span>/</span>
       <Link href={back}>Tìm đối tác</Link><span>/</span><span aria-current="page">Hồ sơ doanh nghiệp</span></nav>
@@ -69,7 +72,7 @@ export default async function Page({params,searchParams}:Props) {
           <a href={sourceUrl} target="_blank" rel="noreferrer">Đối chiếu nguồn hồ sơ ↗</a></div>
       </section>
     </div><aside className="company-profile-sidebar" aria-label="Kết nối doanh nghiệp">
-      <section className="partner-card company-contact-panel"><div className="company-contact-icon" aria-hidden="true"><Icon name="users" size={26}/></div>
+      <section className="partner-card company-contact-panel" data-nosnippet><div className="company-contact-icon" aria-hidden="true"><Icon name="users" size={26}/></div>
         <h2>Liên hệ nhà cung cấp</h2>
         {access ? <><p className="company-access-badge">Bạn đã mở liên hệ · Xem lại miễn phí</p>
           <dl className="company-contact-facts">{[['Người phụ trách',profile.contactPerson],['Địa chỉ',profile.address],['Điện thoại',profile.phone],['Hotline',profile.hotline],['Email',profile.email]].map(([label,value])=>value&&<div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
@@ -92,5 +95,8 @@ export default async function Page({params,searchParams}:Props) {
       <section className="company-profile-help"><h2>Cần thêm lựa chọn?</h2><p>Gửi công việc và địa bàn bạn đang cần để được hỗ trợ tìm đối tác.</p>
         <Link href={'/find-partners?'+new URLSearchParams({province,request:'1'})+'#dang-nhu-cau'}>Nhờ sàn giới thiệu →</Link></section>
     </aside></div>
+    {related.length>0&&<section className="partner-card company-profile-section company-related"><h2>Doanh nghiệp cùng địa bàn {province}</h2><p>Tham khảo thêm các hồ sơ công khai để chọn đơn vị phù hợp.</p>
+      <ul className="partner-items">{related.map(row=><li key={row.id}><Link href={companyPath(row.id)}>{row.name}</Link><small>{companySummary(row.trade)}</small></li>)}</ul>
+      <Link href={'/find-partners?'+new URLSearchParams({province})+'#ket-qua'}>Xem doanh nghiệp tại {province} →</Link></section>}
   </main>;
 }
