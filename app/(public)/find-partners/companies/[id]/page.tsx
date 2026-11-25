@@ -14,7 +14,7 @@ import {partnerSchemaUnavailable} from '../../../../../services/partner-requests
 import {companyPhones} from '../../../../../lib/site/company-phones';
 
 export const dynamic='force-dynamic';
-type Props={params:Promise<{id:string}>;searchParams:Promise<{q?:string;province?:string;ward?:string;page?:string;sort?:string;size?:string}>};
+type Props={params:Promise<{id:string}>;searchParams:Promise<{q?:string;province?:string;ward?:string;page?:string;sort?:string;size?:string;specialty?:string;minYear?:string;maxYear?:string}>};
 export async function generateMetadata({params}:Props) {
   const {id}=await params;
   const company=await getPublishedCompany(id);

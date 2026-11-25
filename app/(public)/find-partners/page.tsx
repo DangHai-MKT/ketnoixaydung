@@ -12,7 +12,7 @@ import PartnerCompanySearch from '../../../components/PartnerCompanySearch';
 import {breadcrumbJson,publicMetadata,privateRobots} from '../../../lib/site/seo';
 
 export const dynamic = 'force-dynamic';
-type Search = {page?:string;requests?:string;q?:string;province?:string;ward?:string;request?:string;sort?:string;size?:string};
+type Search = {page?:string;requests?:string;q?:string;province?:string;ward?:string;request?:string;sort?:string;size?:string;specialty?:string;minYear?:string;maxYear?:string};
 export async function generateMetadata({searchParams}:{searchParams:Promise<Search>}) {
   const params=await searchParams;
   const metadata=publicMetadata('/find-partners','Tìm đối tác xây dựng, nhà thầu và đơn vị thi công',
@@ -20,14 +20,14 @@ export async function generateMetadata({searchParams}:{searchParams:Promise<Sear
   return Object.values(params).some(Boolean) ? {...metadata,robots:privateRobots} : metadata;
 }
 
-export default async function Page({searchParams}:{searchParams:Promise<{page?:string;requests?:string;q?:string;province?:string;ward?:string;request?:string;sort?:string;size?:string}>}) {
+export default async function Page({searchParams}:{searchParams:Promise<{page?:string;requests?:string;q?:string;province?:string;ward?:string;request?:string;sort?:string;size?:string;specialty?:string;minYear?:string;maxYear?:string}>}) {
   const [actor,params] = await Promise.all([getCurrentActor(),searchParams]);
   const signedIn = actor?.status === 'active';
   const pageNumber=(value:unknown)=>typeof value==='string' && /^[1-9]\d{0,3}$/.test(value) ? Number(value) : 1;
-  const {keyword,province,ward,page,sort,size}=companySearch(params);
+  const {keyword,province,ward,page,sort,size,specialty,minYear,maxYear}=companySearch(params);
   const requestPage=pageNumber(params.requests);
   const showRequest=params.request==='1';
-  const filters={q:keyword,province,ward,sort,size:String(size),...(page>1 ? {page:String(page)} : {})};
+  const filters={q:keyword,province,ward,sort,specialty,minYear,maxYear,size:String(size),...(page>1 ? {page:String(page)} : {})};
   const requestHref='?'+new URLSearchParams({...filters,request:'1'})+'#dang-nhu-cau';
   const requestHistory=(next:number)=>'?'+new URLSearchParams({...filters,request:'1',requests:String(next)})+'#nhu-cau-cua-ban';
   const rows = signedIn && showRequest ? await listPartnerRequests(actor,false,requestPage).catch(error=>{
@@ -44,7 +44,7 @@ export default async function Page({searchParams}:{searchParams:Promise<{page?:s
       <p>Đúng chuyên môn.<br/><strong>Thuận đường hợp tác.</strong></p>
       <span>Từ đội thi công đến nhà thầu trọn gói — tìm đơn vị cho công việc bạn đang cần.</span>
       </div>
-      <PartnerCompanySearch key={JSON.stringify([keyword,province,ward,sort,size])} keyword={keyword} province={province} ward={ward} sort={sort} size={size}/>
+      <PartnerCompanySearch key={JSON.stringify([keyword,province,ward,sort,size,specialty,minYear,maxYear])} keyword={keyword} province={province} ward={ward} sort={sort} size={size} specialty={specialty} minYear={minYear} maxYear={maxYear}/>
     </header>
     <div className="partner-help-strip">
       <div><Icon name="search" size={23}/><span><strong>Tìm theo công việc</strong><small>Chuyên môn và địa bàn rõ ràng</small></span></div>
@@ -52,7 +52,7 @@ export default async function Page({searchParams}:{searchParams:Promise<{page?:s
       <div><Icon name="users" size={23}/><span><strong>Kết nối khi phù hợp</strong><small>Mở liên hệ hoặc nhờ sàn giới thiệu</small></span></div>
     </div>
     {signedIn&&<div className="partner-hub-tools"><a href={requestHistory(1)}>Nhu cầu của tôi →</a></div>}
-    <PartnerCompanyResults keyword={keyword} province={province} ward={ward} page={page} showRequest={showRequest} sort={sort} size={size}/>
+    <PartnerCompanyResults keyword={keyword} province={province} ward={ward} page={page} showRequest={showRequest} sort={sort} size={size} specialty={specialty} minYear={minYear} maxYear={maxYear}/>
     {showRequest ? <div id="dang-nhu-cau" className="partner-layout partner-request-panel">
     {rows===null ? <section className="partner-card"><p role="status">Tính năng đang được thiết lập. Vui lòng quay lại sau.</p></section> : signedIn ? <>
       <section className="partner-card"><h2>Đăng nhu cầu tìm đối tác</h2>

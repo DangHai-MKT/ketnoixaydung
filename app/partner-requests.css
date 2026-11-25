@@ -380,14 +380,12 @@
 .company-active-filters {display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;}
 .company-active-filters button {min-height:44px;padding:8px 12px;border:1px solid #bfd6ef;border-radius:24px;background:#eef6ff;color:#164f87;cursor:pointer;font:inherit;font-size:13px;}
 .company-active-filters a {color:#175da6;font-size:14px;padding:10px;}
-.company-pagination {display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-top:24px;padding:18px;border:1px solid #dce7f3;border-radius:12px;background:white;}
-.company-pagination p {margin:0;color:#536b85;font-size:14px;}
-.company-pagination>div,.company-pagination>div>span {display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
-.company-pagination a {display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;padding:8px;border:1px solid #d1dfef;border-radius:8px;color:#204e7b;background:#fff;text-decoration:none;font-weight:650;}
-.company-pagination a[aria-current=page] {background:#165dba;color:white;border-color:#165dba;}
-.company-pagination a:hover {box-shadow:0 0 0 2px #bdd8fa;}
-.company-page-gap {padding:4px;color:#536b85;}
-.company-discovery :focus-visible,.company-pagination :focus-visible {outline:2px solid #1764b8;outline-offset:3px;}
+.company-discovery :focus-visible {outline:2px solid #1764b8;outline-offset:3px;}
 .company-discovery .p2-filter-sortbar button {min-height:44px;}
 .company-discovery .p2-filter-dialog .project-ward-popup {position:relative;max-height:240px;overflow-y:auto;}
-@media(max-width:600px){.company-discovery{padding:14px;margin-top:18px;}.company-keyword-search>div{flex-direction:column;}.company-keyword-search input{font-size:16px;}.company-pagination{padding:12px;}.company-pagination>div{gap:4px;}.company-pagination a{font-size:13px;}}
+@media(max-width:600px){.company-discovery{padding:14px;margin-top:18px;}.company-keyword-search>div{flex-direction:column;}.company-keyword-search input{font-size:16px;}}
+
+.company-loaded-count {text-align:center;color:#526579;margin:24px 0 8px;font-size:14px;}
+.company-filter-hint {margin:0 0 10px;color:#526579;font-size:13px;}
+.company-discovery .p2-filter-body>.p2-filter-fields {margin-bottom:20px;}
+.company-discovery .p2-filter-quick button {min-height:44px;}
