@@ -1,4 +1,5 @@
 import 'server-only';
+import {wardFilterAliases} from '../lib/projects/wards';
 import {and,asc,desc,eq,ilike,isNotNull,inArray,or,sql} from 'drizzle-orm';
 import {db} from '../db/client';
 import {companyContactAccess,partnerCompanies as companies} from '../db/schema';
@@ -13,7 +14,7 @@ export async function listCompanyDirectory(input:CompanySearchInput,buyerId?:str
     filters.minYear?sql`${year} >= ${Number(filters.minYear)}`:undefined,
     filters.maxYear?sql`${year} <= ${Number(filters.maxYear)}`:undefined,
     filters.minYear||filters.maxYear?sql`${year} <> 9999`:undefined,filters.province ? eq(companies.province,filters.province) : undefined,
-      filters.ward ? sql`${companies.profile}->>'ward' = ${filters.ward}` : undefined,
+      filters.ward ? inArray(sql<string>`${companies.profile}->>'ward'`,wardFilterAliases(filters.province,filters.ward)) : undefined,
       ...filters.keyword.split(/\s+/).filter(Boolean).slice(0,10).map(word=>{
         const pattern='%'+word.replace(/[\\%_]/g,'\\$&')+'%';
         return or(ilike(companies.name,pattern),ilike(companies.trade,pattern),

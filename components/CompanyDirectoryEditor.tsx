@@ -6,13 +6,14 @@ import {saveCompanyEdit} from '../lib/site/partner-directory-actions';
 import {provinceOptions} from '../lib/projects/locations';
 import vietnamWards from '../lib/projects/vietnam-wards.json';
 import {profileFields} from '../lib/site/partner-directory-csv';
+import {canonicalWard} from '../lib/projects/wards';
 import ProjectWardPicker from './ProjectWardPicker';
 
 type Initial={name:string;trade:string;province:string;taxCode:string|null;website:string|null;sourceUrl:string;profile:Partial<Record<string,string>>};
 const wards:Readonly<Record<string,readonly string[]>>=vietnamWards;
 export default function CompanyDirectoryEditor({id,initial,version,published,back}:{id:string;initial:Initial;version:string;published:boolean;back:string}) {
   const [fields,setFields]=useState<Record<string,string>>({...Object.fromEntries(profileFields.map(([key])=>[key,initial.profile[key]??''])),
-    name:initial.name,trade:initial.trade,province:initial.province,taxCode:initial.taxCode??'',website:initial.website??'',sourceUrl:initial.sourceUrl});
+    ward:canonicalWard(initial.province,initial.profile.ward??'')||initial.profile.ward||'',name:initial.name,trade:initial.trade,province:initial.province,taxCode:initial.taxCode??'',website:initial.website??'',sourceUrl:initial.sourceUrl});
   const [result,submit,pending]=useActionState(saveCompanyEdit.bind(null,id),{ok:false,message:'',version:undefined as string|undefined});
   const change=(key:string,value:string)=>setFields(old=>({...old,[key]:value}));
   const input=(key:string,label:string,max:number,type='text',required=false)=><label key={key}>{label}{required?' *':''}
@@ -31,7 +32,7 @@ export default function CompanyDirectoryEditor({id,initial,version,published,bac
       <section className="partner-card directory-edit-section"><p className="company-section-number">02 · ĐỊA BÀN</p><h2>Địa chỉ doanh nghiệp</h2>
         <div className="directory-edit-grid"><label>Tỉnh / thành *<select name="province" value={fields.province} required
           onChange={e=>setFields(old=>({...old,province:e.target.value,ward:''}))}><option value="">Chọn tỉnh / thành</option>{fields.province&&!provinceOptions.includes(fields.province)&&<option value={fields.province}>{fields.province} (cần đối chiếu)</option>}{provinceOptions.map(p=><option key={p}>{p}</option>)}</select></label>
-          <div><ProjectWardPicker key={fields.province} label="Phường / xã" value={fields.ward}
+          <div><ProjectWardPicker key={fields.province} province={fields.province} label="Phường / xã" value={fields.ward}
             options={Object.hasOwn(wards,fields.province)?wards[fields.province]:[]} onChange={value=>change('ward',value)}/><input type="hidden" name="ward" value={fields.ward}/></div></div>
         {profileInput('address')}
         <p className="directory-edit-hint">Chọn phường/xã hiện hành sau khi đối chiếu vị trí doanh nghiệp. Địa chỉ gốc vẫn được lưu để tra cứu.</p>

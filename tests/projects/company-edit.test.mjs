@@ -9,11 +9,13 @@ const locations=compile(await read('lib/projects/locations.ts'));
 const phones=compile(await read('lib/site/company-phones.ts'));
 const csv=compile((await read('lib/site/partner-directory-csv.ts')).replace('../projects/locations',locations).replace('./company-phones',phones));
 const wards=url('export default '+await read('lib/projects/vietnam-wards.json'));
+const wardAliases=url('export default '+await read('lib/projects/vietnam-ward-aliases.json'));
+const wardHelpers=compile((await read('lib/projects/wards.ts')).replace('./vietnam-wards.json',wards).replace('./vietnam-ward-aliases.json',wardAliases));
 const conversion=url('export default '+await read('lib/projects/vietnam-ward-conversion.json'));
 const address=compile((await read('lib/site/company-address.ts')).replace('../projects/vietnam-ward-conversion.json',conversion).replace('../projects/locations',locations));
 const {profileFields}=await import(csv);
 const {companyEditVersion,parseCompanyEdit,mergeEditedProfile}=await import(compile((await read('lib/site/company-edit.ts'))
-  .replace('./partner-directory-csv',csv).replace('../projects/vietnam-wards.json',wards).replace('./company-address',address)));
+  .replace('./partner-directory-csv',csv).replace('../projects/wards',wardHelpers).replace('./company-address',address)));
 const initial={name:'Doanh nghiệp A',trade:'Thi công',province:'Hà Nội',taxCode:null,website:null,sourceUrl:'https://example.com',
   profile:{address:'12 A, Phường Ba Đình, Hà Nội',ward:'Phường Ba Đình',phone:'0901234567',experience:'Dòng một\nDòng hai',addressOriginal:'Địa chỉ nguồn',addressStatus:'manual'}};
 function form(){const f=new FormData();for(const k of ['name','trade','province','taxCode','website','sourceUrl'])f.set(k,initial[k]??'');for(const [k] of profileFields)f.set(k,initial.profile[k]??'');return f;}

@@ -1,0 +1,16 @@
+{
+  "verifiedAt": "2026-11-25",
+  "datasetAsOf": "2026-09-25",
+  "provinceCount": 34,
+  "wardCount": 3321,
+  "renamedOrRetyped": 36,
+  "sources": [
+    "https://danhmuchanhchinh.nso.gov.vn/",
+    "https://danhmuchanhchinh.nso.gov.vn/Tinh_tk_new.aspx",
+    "https://chinhphu.vn/?classid=0&docid=217876&pageid=27160",
+    "https://vanban.chinhphu.vn/?docid=219223&pageid=27160",
+    "https://eakly.daklak.gov.vn/"
+  ],
+  "machineReadableSource": "https://github.com/zindont/vietnam-address-kit/tree/f584592cbd8233647affad82e005caece4f6d485/src/data/official",
+  "note": "Official 2026 counts verified. Includes 10 Dong Nai and 12 Bac Ninh commune-to-ward amendments. Code 24496 corrected to Xa Ea Kly (Xã Ea Kly), not upstream typo Xa Ea Kly / ward. Split or ambiguous boundaries still require review."
+}

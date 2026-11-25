@@ -79,7 +79,7 @@ export default function ProjectEditor({id,mode='edit',versionId,initialStep=1}:{
     {provinceOptions.map(name=><option key={name} value={name}>{name}</option>)}
    </select>
   </label>;
-  if (key === 'districtName') return <ProjectWardPicker key={provinceCode} label={label}
+  if (key === 'districtName') return <ProjectWardPicker key={provinceCode} province={currentProvince} label={label}
    value={fields.districtName} options={wardOptions} onChange={districtName=>updateFields({districtName})}/>;
   return <label key={key}>{label}{rows?<textarea value={fields[key]} rows={rows} maxLength={key==='publicSummary'?5000:key==='technicalSummary'?3000:key==='scopeSummary'?240:1000} onChange={event=>{setFields({...fields,[key]:event.target.value});setDirty(true);}}/>:<input list={choices[key]?`project-options-${key}`:undefined} value={fields[key]} required={key==='title'} inputMode={key==='pricePoints'?'numeric':key.startsWith('size')?'decimal':undefined} maxLength={key==='title'?300:key==='pricePoints'?19:key==='projectStage'?80:120} onChange={event=>{setFields({...fields,[key]:event.target.value});setDirty(true);}}/>}{choices[key]&&<datalist id={`project-options-${key}`}>{choices[key]?.map(value=><option key={value} value={value}/>)}</datalist>}</label>;
  }

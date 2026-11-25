@@ -26,3 +26,17 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+Catalogue synchronization verified 2026-11-25:
+- Shared picker catalogue: vietnam-wards.json; 34 provinces and 3,321 units.
+- Province keys remain unchanged for existing stored data and URLs.
+- Official amendments: 237/NQ-UBTVQH16 (10 Dong Nai wards, effective 2026-04-30),
+  388/NQ-UBTVQH16 (12 Bac Ninh wards, effective 2026-09-20).
+- Sources: https://danhmuchanhchinh.nso.gov.vn/Tinh_tk_new.aspx
+  https://chinhphu.vn/?classid=0&docid=217876&pageid=27160
+  https://vanban.chinhphu.vn/?docid=219223&pageid=27160
+- Upstream code 24496 has an invalid name/type (Xa Ea Kly / ward).
+  Corrected to Xã Ea Kly using the official code catalogue and https://eakly.daklak.gov.vn/.
+- Conversion targets and current names synchronized by official unit code.
+- Historical display spellings and former commune labels retained in vietnam-ward-aliases.json.
+- Snapshot as-of remains 2026-09-25; verification date is separate, not a claim of a new official release.

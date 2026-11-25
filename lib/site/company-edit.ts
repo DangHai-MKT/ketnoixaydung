@@ -1,10 +1,9 @@
 import {createHash} from 'node:crypto';
 import {directoryColumns,parsePartnerDirectory,profileFields} from './partner-directory-csv';
-import vietnamWards from '../projects/vietnam-wards.json';
+import {canonicalWard} from '../projects/wards';
 import {enrichCompanyAddress} from './company-address';
 
 export type CompanyEditData={name:string;trade:string;province:string;taxCode:string|null;website:string|null;sourceUrl:string;profile:Partial<Record<string,string>>};
-const wards:Readonly<Record<string,readonly string[]>>=vietnamWards;
 export function companyEditVersion(row:CompanyEditData) {
   return createHash('sha256').update(JSON.stringify([row.name,row.trade,row.province,row.taxCode,row.website,row.sourceUrl,
     Object.entries(row.profile).sort(([a],[b])=>a.localeCompare(b))])).digest('hex');
@@ -19,7 +18,7 @@ export function parseCompanyEdit(form:FormData) {
   const [row]=parsePartnerDirectory(csv);
   if(!row.company)throw Error(row.error);
   const province=row.company.province;
-  if(profile.ward&&(!Object.hasOwn(wards,province)||!wards[province].includes(profile.ward)))throw Error('Chọn phường/xã thuộc tỉnh/thành của doanh nghiệp.');
+  if(profile.ward){const selected=canonicalWard(province,profile.ward);if(!selected)throw Error('Chọn phường/xã thuộc tỉnh/thành của doanh nghiệp.');profile.ward=selected;}
   profile.phone=row.company.profile.phone??'';profile.hotline=row.company.profile.hotline??'';
   return {...row.company,profile};
 }

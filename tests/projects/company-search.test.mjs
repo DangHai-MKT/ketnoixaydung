@@ -7,7 +7,9 @@ const url=s=>'data:text/javascript;base64,'+Buffer.from(s).toString('base64');
 const compile=s=>url(ts.transpileModule(s,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText);
 const locations=compile(await read('lib/projects/locations.ts'));
 const wards=url('export default '+await read('lib/projects/vietnam-wards.json'));
-const {companySearch}=await import(compile((await read('lib/site/company-search.ts')).replace('../projects/locations',locations).replace('../projects/vietnam-wards.json',wards)));
+const wardAliases=url('export default '+await read('lib/projects/vietnam-ward-aliases.json'));
+const wardHelpers=compile((await read('lib/projects/wards.ts')).replace('./vietnam-wards.json',wards).replace('./vietnam-ward-aliases.json',wardAliases));
+const {companySearch}=await import(compile((await read('lib/site/company-search.ts')).replace('../projects/locations',locations).replace('../projects/wards',wardHelpers)));
 const {companyResultsPath}=await import(compile(await read('lib/site/company-display.ts')));
 test('Invalid search parameters use bounded defaults and mismatched wards are discarded',()=>{
   const result=companySearch({q:['bad'],province:'unknown',ward:'Phường Ba Đình',size:'100000',page:'-1',sort:'random'});
