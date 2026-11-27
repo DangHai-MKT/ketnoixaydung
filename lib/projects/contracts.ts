@@ -1,7 +1,7 @@
 import {maskPublicContact} from './privacy';
 import {publicProjectDataKeys} from './facts';
 // These allowlists are the ONLY public projection, also used by public preview.
-export function publicProject(row: { id: string; slug: string; publishedAt: Date | string | null }, version: {
+export function publicProject(row: { id: string; slug: string; publicSlug?:string|null; publishedAt: Date | string | null }, version: {
   id: string; versionNo: number; title: string; category: string; provinceCode: string | null; districtName: string | null; projectStage: string | null;
   sizeMinSqm: string | null; sizeMaxSqm: string | null; publicSummary: string; publicData: Record<string, unknown>; pricePoints: bigint | string;
 }) {
@@ -10,7 +10,7 @@ export function publicProject(row: { id: string; slug: string; publishedAt: Date
     const value=version.publicData?.[key];
     return [key,typeof value==='string'?maskPublicContact(value):''];
   })) as Record<typeof publicProjectDataKeys[number],string>;
-  return { id: row.id, slug: maskPublicContact(row.slug), publishedAt: row.publishedAt, versionId: version.id, versionNo: version.versionNo,
+  return { id: row.id, publicSlug:row.publicSlug??null, slug: maskPublicContact(row.slug), publishedAt: row.publishedAt, versionId: version.id, versionNo: version.versionNo,
     title: maskPublicContact(version.title), category: maskPublicContact(version.category), provinceCode: clean(version.provinceCode), districtName: clean(version.districtName),
     projectStage: clean(version.projectStage), sizeMinSqm: version.sizeMinSqm, sizeMaxSqm: version.sizeMaxSqm,
     publicSummary: maskPublicContact(version.publicSummary), pricePoints: version.pricePoints.toString(),

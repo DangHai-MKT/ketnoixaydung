@@ -33,3 +33,19 @@ npx drizzle-kit check
 npx drizzle-kit generate
 ```
 The Drizzle Kit commands depend on pinned package versions and a complete migration snapshot. Review generated SQL; do not blindly apply to production.
+
+
+## URL công khai tiếng Việt — 0018
+
+Trang chi tiết công khai dùng `/du-an/<ten-du-an>` và `/doanh-nghiep/<ten-doanh-nghiep>`.
+Tên đường dẫn không dấu, tách từ bằng dấu gạch ngang; trùng tên được thêm số thứ tự.
+URL được cấp khi công bố và giữ nguyên khi sửa tên. UUID và các URL của API/đơn mua không thay đổi.
+URL chi tiết cũ chuyển hướng HTTP 308 sang URL mới, giữ lại tham số tìm kiếm.
+
+Khi khởi động production, `next.config.mjs` tự chạy `scripts/apply-public-slugs.mjs` trên
+`ketnoixaydungvn_db`. Migration `0018_public_slugs.sql` thêm hai cột `public_slug`, chỉ mục,
+ràng buộc và trigger; cấp URL cho nội dung đã công khai. Không xóa dữ liệu hoặc sửa UUID/slug cũ.
+Không cần thêm biến môi trường. Chỉ khởi động website khi bước này hoàn tất; log mong đợi:
+`[public-urls-0018] APPLIED` hoặc `ALREADY_APPLIED`. Lỗi sẽ rollback và chặn khởi động để tránh
+website chạy với schema URL chưa đầy đủ. Bộ dữ liệu thử dùng `applyPublicSlugs(client, expectedDatabase)`
+với tên cơ sở dữ liệu thử đã xác nhận, không dùng hàm chạy production để thay đích tùy ý.

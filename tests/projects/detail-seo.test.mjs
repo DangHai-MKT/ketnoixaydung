@@ -16,7 +16,7 @@ test('Company schema only describes publicly visible organization information',t
   origin(t);const input={id:'company',name:'Công ty Xây dựng An Bình',trade:'Thiết kế; Thi công',province:'Đồng Nai',year:'2012',market:'Miền Nam',website:'https://company.example.com',profile:{address:'PRIVATE_ADDRESS',phone:'0912345678',email:'secret@example.com',zalo:'https://zalo.me/private'},taxCode:'PRIVATE_TAX'};
   const {metadata,json}=companySeo(input);assert(metadata.title.includes('Đồng Nai'));assert(metadata.description.length<=160);
   const graph=JSON.parse(json)['@graph'];assert.equal(graph[1]['@type'],'Organization');assert.equal(graph[1].foundingDate,'2012');assert.equal(graph[1].areaServed,'Miền Nam');assert.equal(graph[0].mainEntity['@id'],graph[1]['@id']);
-  for(const secret of ['PRIVATE_ADDRESS','0912345678','secret@example.com','zalo.me/private','PRIVATE_TAX','streetAddress','telephone','aggregateRating'])assert(!json.includes(secret),secret);
+  for(const secret of ['company.example.com','sameAs','PRIVATE_ADDRESS','0912345678','secret@example.com','zalo.me/private','PRIVATE_TAX','streetAddress','telephone','aggregateRating'])assert(!json.includes(secret),secret);
 });
 test('SEO ignores unsupported dates and URLs and escapes scripts',t=>{
   origin(t);const {json}=companySeo({id:'safe',name:'Doanh nghiệp </script><script>unsafe</script>',trade:'Thi công',province:'Hà Nội',year:'tomorrow',website:'javascript:alert(1)',publishedAt:'invalid'});

@@ -10,7 +10,8 @@ const wards=url('export default '+await read('lib/projects/vietnam-wards.json'))
 const wardAliases=url('export default '+await read('lib/projects/vietnam-ward-aliases.json'));
 const wardHelpers=compile((await read('lib/projects/wards.ts')).replace('./vietnam-wards.json',wards).replace('./vietnam-ward-aliases.json',wardAliases));
 const {companySearch}=await import(compile((await read('lib/site/company-search.ts')).replace('../projects/locations',locations).replace('../projects/wards',wardHelpers)));
-const {companyResultsPath}=await import(compile(await read('lib/site/company-display.ts')));
+const publicPaths=compile(await read('lib/site/public-paths.ts'));
+const {companyResultsPath}=await import(compile((await read('lib/site/company-display.ts')).replace('./public-paths',publicPaths)));
 test('Invalid search parameters use bounded defaults and mismatched wards are discarded',()=>{
   const result=companySearch({q:['bad'],province:'unknown',ward:'Phường Ba Đình',size:'100000',page:'-1',sort:'random'});
   assert.deepEqual(result,{specialty:'',minYear:'',maxYear:'',keyword:'',province:'',ward:'',size:12,page:1,sort:'newest'});

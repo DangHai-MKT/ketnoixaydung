@@ -5,6 +5,7 @@ import {listProjectSitemapEntries} from '../services/public-projects';
 import {cmsEnabled,listCmsSitemapEntries} from '../services/cms';
 import {cmsPublicPath} from '../lib/cms/content';
 import {listCompanySitemapEntries} from '../services/public-companies';
+import {projectPath} from '../lib/site/public-paths';
 import {companyPath} from '../lib/site/company-display';
 
 export const dynamic = 'force-dynamic';
@@ -21,9 +22,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...paths.map(path => ({url: origin + path})),
     ...content.map(row=>({url:origin+cmsPublicPath(row.kind,row.slug),lastModified:row.publishedAt})),
     ...projects.map(project => ({
-      url: origin + '/projects/' + project.id,
+      url: origin + projectPath(project),
       lastModified: project.approvedAt ?? undefined,
     })),
-    ...companies.map(company=>({url:origin+companyPath(company.id),lastModified:company.publishedAt??undefined})),
+    ...companies.map(company=>({url:origin+companyPath(company.id,company.publicSlug),lastModified:company.publishedAt??undefined})),
   ];
 }

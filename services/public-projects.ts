@@ -9,7 +9,7 @@ import {safeProjectPublicContent} from './project-public-safety';
 import {projectFieldFilters} from './project-filters';
 import {provinceLabel} from '../lib/projects/locations';
 const projection = {
-  id: projects.id, slug: projects.slug, publishedAt: projects.publishedAt,
+  id: projects.id, slug: projects.slug, publicSlug:projects.publicSlug, publishedAt: projects.publishedAt,
   versionId: projectVersions.id, versionNo: projectVersions.versionNo, title: projectVersions.title, category: projectVersions.category,
   provinceCode: projectVersions.provinceCode, districtName: projectVersions.districtName, projectStage: projectVersions.projectStage,
   sizeMinSqm: projectVersions.sizeMinSqm, sizeMaxSqm: projectVersions.sizeMaxSqm, publicSummary: projectVersions.publicSummary,
@@ -63,8 +63,11 @@ export async function listPublicProjects(params: URLSearchParams) {
   const total = count[0].total;
   return { data: await attachPublicFiles(rows), pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) } };
 }
-export async function getPublicProject(id: string) {
-  const rows = await queryPublic().where(and(publishedConditions(), eq(projects.id, id))).limit(1);
+export async function getPublicProject(id:string) {return publicProjectDetail(eq(projects.id,id));}
+export async function getPublicProjectBySlug(slug:string) {return publicProjectDetail(eq(projects.publicSlug,slug));}
+export async function getPublicProjectByLegacySlug(slug:string) {return publicProjectDetail(eq(projects.slug,slug));}
+async function publicProjectDetail(locator:ReturnType<typeof eq>) {
+  const rows = await queryPublic().where(and(publishedConditions(),locator)).limit(1);
   if (!rows.length) return null;
   const { versionId } = rows[0];
   const data = projectPrivateData.privateData;
@@ -92,7 +95,7 @@ export async function listLatestPublicProjects(limit: number) {
 }
 
 export async function listProjectSitemapEntries(limit: number) {
-  return db.select({id: projects.id, approvedAt: projectVersions.approvedAt})
+  return db.select({id: projects.id, publicSlug:projects.publicSlug, approvedAt: projectVersions.approvedAt})
     .from(projects).innerJoin(projectVersions, eq(projectVersions.projectId, projects.id))
     .innerJoin(users, eq(users.id, projects.sellerId)).innerJoin(sellerProfiles, eq(sellerProfiles.userId, projects.sellerId))
     .where(publishedConditions()).orderBy(desc(projectVersions.approvedAt), desc(projects.id)).limit(limit);

@@ -31,7 +31,7 @@ export async function saveCompanyEdit(id:string,_state:{ok:boolean;message:strin
         reason:'Quản trị sửa hoặc bổ sung hồ sơ doanh nghiệp',metadata:{changedFields:changed}});
       return {ok:true,message:'Đã lưu thông tin doanh nghiệp.'+(previous.publishedAt?' Trang khách hàng đã được cập nhật.':''),version:companyEditVersion(next)};
     });
-    if(result.ok){revalidatePath('/admin/partner-directory');revalidatePath('/admin/partner-directory/'+id);revalidatePath('/find-partners');revalidatePath(companyPath(id));}
+    if(result.ok){revalidatePath('/doanh-nghiep','layout');revalidatePath('/sitemap.xml');revalidatePath('/admin/partner-directory');revalidatePath('/admin/partner-directory/'+id);revalidatePath('/find-partners');revalidatePath(companyPath(id));}
     return result;
   }catch(error){const failure=error as {code?:string;cause?:{code?:string}};return {ok:false,message:(failure.cause?.code??failure.code)==='23505'
     ?'Tên doanh nghiệp trong tỉnh/thành này hoặc mã số thuế đã có trong danh bạ. Kiểm tra hồ sơ trùng trước khi lưu.'
@@ -57,6 +57,7 @@ export async function bulkCompanyPublication(_state:{message:string;ok:boolean},
       return result;
     });
   }catch{return {ok:false,message:'Chưa cập nhật được hồ sơ. Không có thay đổi nào được lưu; vui lòng thử lại.'};}
+  revalidatePath('/doanh-nghiep','layout');revalidatePath('/sitemap.xml');
   revalidatePath('/admin/partner-directory');revalidatePath('/find-partners');revalidatePath('/find-partners/companies');
   for(const row of changed){revalidatePath(companyPath(row.id));revalidatePath('/admin/partner-directory/'+row.id);}
   return {ok:true,message:`Đã ${published?'công khai':'ẩn'} ${changed.length} hồ sơ. ${ids.length-changed.length} hồ sơ không thay đổi, cần bổ sung thông tin hoặc không còn tồn tại.`};

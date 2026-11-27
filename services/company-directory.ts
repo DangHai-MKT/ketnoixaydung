@@ -23,7 +23,7 @@ export async function listCompanyDirectory(input:CompanySearchInput,buyerId?:str
   const [count]=await db.select({total:sql<number>`count(*)::int`}).from(companies).where(where)
     .catch(error=>{if(partnerSchemaUnavailable(error))return [{total:0}];throw error;});
   const total=count.total,pages=Math.max(1,Math.ceil(total/filters.size)),page=Math.min(filters.page,pages);
-  const rows=await db.select({id:companies.id,name:companies.name,trade:companies.trade,province:companies.province,
+  const rows=await db.select({id:companies.id,publicSlug:companies.publicSlug,name:companies.name,trade:companies.trade,province:companies.province,
     year:sql<string>`coalesce(${companies.profile}->>'year','')`,
     employees:sql<string>`coalesce(${companies.profile}->>'employees','')`,
     market:sql<string>`left(coalesce(${companies.profile}->>'market',''),120)`})

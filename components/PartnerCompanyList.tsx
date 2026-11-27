@@ -28,8 +28,8 @@ export default function PartnerCompanyList({initial,queryString,requestHref}:{in
   }
   return <div>
     {rows.length ? <ul className="company-directory-list">
-      {rows.map(({id,name,trade,province,year,employees,market,unlocked})=>{
-        const detail=companyPath(id)+'?'+new URLSearchParams({q:keyword,province:provinceFilter,ward,page:String(page),sort,size:String(size),specialty,minYear,maxYear});
+      {rows.map(({id,publicSlug,name,trade,province,year,employees,market,unlocked})=>{
+        const detail=companyPath(id,publicSlug)+'?'+new URLSearchParams({q:keyword,province:provinceFilter,ward,page:String(page),sort,size:String(size),specialty,minYear,maxYear});
         return <li key={id}><article className="company-directory-row">
           <span className="company-directory-avatar" aria-hidden="true"><Icon name="industrial" size={28}/></span>
           <div className="company-directory-main">

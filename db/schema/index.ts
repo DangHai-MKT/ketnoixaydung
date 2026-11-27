@@ -136,6 +136,7 @@ export const projects = pgTable('projects', {
   id: uuid('id').primaryKey().defaultRandom(),
   sellerId: uuid('seller_id').notNull(),
   slug: varchar('slug', { length: 320 }).notNull(),
+  publicSlug: varchar('public_slug', {length:220}),
   title: varchar('title', { length: 300 }).notNull(),
   category: varchar('category', { length: 100 }).notNull(),
   provinceCode: varchar('province_code', { length: 20 }),
@@ -155,6 +156,7 @@ export const projects = pgTable('projects', {
   createdAt: now(), updatedAt: updatedNow(),
 }, (t) => [
   uniqueIndex('projects_slug_uq').on(t.slug),
+  uniqueIndex('projects_public_slug_uq').on(t.publicSlug),
   index('projects_status_published_idx')
   .on(t.status, t.publishedAt.desc().nullsFirst()),
 
@@ -845,6 +847,7 @@ export const partnerCompanies = pgTable('partner_companies', {
   identityKey: text('identity_key').notNull().unique(),
   taxCode: text('tax_code').unique(),
   name: text('name').notNull(),
+  publicSlug: varchar('public_slug', {length:220}),
   trade: text('trade').notNull(),
   province: text('province').notNull(),
   website: text('website'),
@@ -853,7 +856,7 @@ export const partnerCompanies = pgTable('partner_companies', {
   publishedAt: timestamp('published_at', {withTimezone:true}),
   importedBy: uuid('imported_by').notNull().references(() => users.id),
   createdAt: now(),
-});
+},t=>[uniqueIndex('partner_companies_public_slug_uq').on(t.publicSlug)]);
 
 export const partnerRequests = pgTable('partner_requests', {
   id: uuid('id').primaryKey(),

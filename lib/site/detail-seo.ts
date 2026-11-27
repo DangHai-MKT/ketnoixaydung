@@ -1,3 +1,4 @@
+import {projectPath} from './public-paths';
 import type {PublicProject} from '../projects/contracts';
 import {maskPublicContact} from '../projects/privacy';
 import {provinceLabel} from '../projects/locations';
@@ -23,7 +24,7 @@ export function projectSeo(project:PublicProject) {
   const location=[project.districtName,province].filter(Boolean).join(', ');
   const facts=[project.publicData.constructionType||category,location,project.projectStage].filter(Boolean).join(' · ');
   const description=text([facts,project.publicSummary||project.title].filter(Boolean).join('. '));
-  const path='/projects/'+project.id;
+  const path=projectPath(project);
   const metadata=publicMetadata(path,title,description,project.imageUrl??undefined);
   const graph=pageGraph(path,title,description,project.publishedAt);
   if(!graph)return {metadata,json:null};
@@ -35,12 +36,12 @@ export function projectSeo(project:PublicProject) {
     ...(publicImages.length?{image:publicImages,primaryImageOfPage:{'@type':'ImageObject',url:publicImages[0]}}:{})})};
 }
 // Deliberately accept only public profile fields. Never spread a database row/profile into JSON-LD.
-export type CompanySeoInput={id:string;name:string;trade:string;province:string;year?:string;market?:string;website?:string|null;publishedAt?:Date|string|null};
+export type CompanySeoInput={id:string;publicSlug?:string|null;name:string;trade:string;province:string;year?:string;market?:string;website?:string|null;publishedAt?:Date|string|null};
 export function companySeo(company:CompanySeoInput) {
   const name=text(company.name,110),province=text(company.province,60);
   const description=text([`${text(company.name,65)} tại ${province}`,text(company.trade,65),'Xem năng lực và dịch vụ xây dựng.'].filter(Boolean).join('. '));
   const title=name.toLocaleLowerCase('vi').includes(province.toLocaleLowerCase('vi'))?name:name+' – '+province;
-  const path=companyPath(company.id),metadata=publicMetadata(path,title,description);
+  const path=companyPath(company.id,company.publicSlug),metadata=publicMetadata(path,title,description);
   const page=pageGraph(path,name,description,company.publishedAt);
   if(!page)return {metadata,json:null};
   const origin=publicOrigin()!;
@@ -48,6 +49,5 @@ export function companySeo(company:CompanySeoInput) {
     url:origin+path,description:text(company.trade),mainEntityOfPage:{'@id':origin+path+'#webpage'}};
   if(company.market)organization.areaServed=text(company.market,200);
   if(company.year&&/^\d{4}$/.test(company.year)&&Number(company.year)>=1800&&Number(company.year)<=new Date().getFullYear())organization.foundingDate=company.year;
-  if(company.website){try{const url=new URL(company.website);if(['https:','http:'].includes(url.protocol)&&!url.username&&!url.password)organization.sameAs=[url.href];}catch{/* Ignore invalid source URLs. */}}
   return {metadata,json:structuredData({'@context':'https://schema.org','@graph':[{...page,mainEntity:{'@id':organization['@id']}},organization]})};
 }

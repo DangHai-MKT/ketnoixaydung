@@ -41,6 +41,10 @@ export default async function nextConfig(phase) {
     const { runDirectoryMigration } = await import('./scripts/apply-partner-directory.mjs');
     await runDirectoryMigration();
   }
+  if(phase===nextConstants.PHASE_PRODUCTION_SERVER&&!isolatedAuthTest) {
+    const {runPublicSlugMigration}=await import('./scripts/apply-public-slugs.mjs');
+    await runPublicSlugMigration();
+  }
   return {
     ...config,
     // Complete metadata before sending HTML to crawlers and link-preview clients.

@@ -28,7 +28,7 @@ export default async function Page({params,searchParams}:{params:Promise<{id:str
         <button className="button button-primary">{row.publishedAt?'Ẩn hồ sơ':'Công khai hồ sơ'}</button></fieldset></form>
       <div className="directory-detail-links"><a href={row.sourceUrl} target="_blank" rel="noreferrer">Đối chiếu nguồn ↗</a>
         {row.website&&<a href={row.website} target="_blank" rel="noreferrer">Website doanh nghiệp ↗</a>}
-        {row.publishedAt&&<Link href={companyPath(row.id)}>Xem trang khách hàng →</Link>}</div>
+        {row.publishedAt&&<Link href={companyPath(row.id,row.publicSlug)}>Xem trang khách hàng →</Link>}</div>
       {row.profile.addressOriginal&&<p className="directory-edit-hint"><strong>Địa chỉ gốc</strong><br/>{row.profile.addressOriginal}</p>}
     </aside></div>
   </main>;

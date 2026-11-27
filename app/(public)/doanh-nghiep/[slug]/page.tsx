@@ -1,35 +1,35 @@
 import Link from 'next/link';
-import {companySeo} from '../../../../../lib/site/detail-seo';
+import {companySeo} from '../../../../lib/site/detail-seo';
 import {notFound} from 'next/navigation';
 import {and,eq} from 'drizzle-orm';
-import {db} from '../../../../../db/client';
-import {companyContactAccess} from '../../../../../db/schema';
-import {getPublishedCompany,listRelatedCompanies} from '../../../../../services/public-companies';
-import {getCurrentActor} from '../../../../../lib/auth/server';
-import {companyPath,companySummary,companyResultsPath} from '../../../../../lib/site/company-display';
-import {breadcrumbJson} from '../../../../../lib/site/seo';
-import {unlockCompanyContact} from '../../../../../lib/site/company-contact-actions';
-import {PartnerRequestForm} from '../../../../../components/PartnerRequestForm';
-import Icon from '../../../../../components/MarketplaceIcon';
-import {partnerSchemaUnavailable} from '../../../../../services/partner-requests';
-import {companyPhones} from '../../../../../lib/site/company-phones';
+import {db} from '../../../../db/client';
+import {companyContactAccess} from '../../../../db/schema';
+import {getPublishedCompanyBySlug,listRelatedCompanies} from '../../../../services/public-companies';
+import {getCurrentActor} from '../../../../lib/auth/server';
+import {companyPath,companySummary,companyResultsPath} from '../../../../lib/site/company-display';
+import {breadcrumbJson} from '../../../../lib/site/seo';
+import {unlockCompanyContact} from '../../../../lib/site/company-contact-actions';
+import {PartnerRequestForm} from '../../../../components/PartnerRequestForm';
+import Icon from '../../../../components/MarketplaceIcon';
+import {partnerSchemaUnavailable} from '../../../../services/partner-requests';
+import {companyPhones} from '../../../../lib/site/company-phones';
 
 export const dynamic='force-dynamic';
-type Props={params:Promise<{id:string}>;searchParams:Promise<{q?:string;province?:string;ward?:string;page?:string;sort?:string;size?:string;specialty?:string;minYear?:string;maxYear?:string}>};
+type Props={params:Promise<{slug:string}>;searchParams:Promise<{q?:string;province?:string;ward?:string;page?:string;sort?:string;size?:string;specialty?:string;minYear?:string;maxYear?:string}>};
 export async function generateMetadata({params}:Props) {
-  const {id}=await params;
-  const company=await getPublishedCompany(id);
+  const {slug}=await params;
+  const company=await getPublishedCompanyBySlug(slug);
   if(!company)notFound();
-  return companySeo({id:company.id,name:company.name,trade:company.trade,province:company.province,year:company.profile.year,market:company.profile.market,website:company.website,publishedAt:company.publishedAt}).metadata;
+  return companySeo({id:company.id,publicSlug:company.publicSlug,name:company.name,trade:company.trade,province:company.province,year:company.profile.year,market:company.profile.market,publishedAt:company.publishedAt}).metadata;
 }
 
 export default async function Page({params,searchParams}:Props) {
-  const [{id},query,actor]=await Promise.all([params,searchParams,getCurrentActor()]);
-  const company=await getPublishedCompany(id);
+  const [{slug},query,actor]=await Promise.all([params,searchParams,getCurrentActor()]);
+  const company=await getPublishedCompanyBySlug(slug);
   if(!company)notFound();
-  const {name,trade,province,profile,website,sourceUrl}=company;
-  const path=companyPath(id);
-  const seo=companySeo({id,name,trade,province,year:profile.year,market:profile.market,website,publishedAt:company.publishedAt});
+  const {id,name,trade,province,profile,website,publicSlug}=company;
+  const path=companyPath(id,publicSlug);
+  const seo=companySeo({id,publicSlug,name,trade,province,year:profile.year,market:profile.market,publishedAt:company.publishedAt});
   const related=await listRelatedCompanies(id,province);
   const contactAccess=actor?.status==='active' ? await db.select({id:companyContactAccess.companyId}).from(companyContactAccess)
     .where(and(eq(companyContactAccess.companyId,id),eq(companyContactAccess.buyerId,actor.id))).limit(1)
@@ -66,11 +66,6 @@ export default async function Page({params,searchParams}:Props) {
       </section>}
       {profile.experience&&<section className="partner-card company-profile-section"><p className="company-section-number">03 · NĂNG LỰC</p>
         <h2>Giới thiệu &amp; kinh nghiệm</h2><p className="company-profile-prose">{profile.experience}</p></section>}
-      <section className="partner-card company-profile-section company-source-note"><h2>Thông tin hồ sơ</h2>
-        <p>Thông tin tổng hợp từ hồ sơ nguồn. Bạn nên trao đổi trực tiếp và kiểm tra năng lực trước khi quyết định hợp tác.</p>
-        <div className="fw-actions">{website&&<a href={website} target="_blank" rel="noreferrer">Website doanh nghiệp ↗</a>}
-          <a href={sourceUrl} target="_blank" rel="noreferrer">Đối chiếu nguồn hồ sơ ↗</a></div>
-      </section>
     </div><aside className="company-profile-sidebar" aria-label="Kết nối doanh nghiệp">
       <section className="partner-card company-contact-panel" data-nosnippet><div className="company-contact-icon" aria-hidden="true"><Icon name="users" size={26}/></div>
         <h2>Liên hệ nhà cung cấp</h2>
@@ -81,10 +76,11 @@ export default async function Page({params,searchParams}:Props) {
             {companyPhones(profile.hotline).map(phone=><a key={phone} className="button button-secondary" href={'tel:'+phone.replace(/[^+0-9]/g,'')}>Hotline {phone}</a>)}
             {profile.zalo?.split(';').map(s=>s.trim()).filter(Boolean).map((link,i)=><a className="button button-secondary" key={link} href={link} target="_blank" rel="noreferrer">Nhắn Zalo{profile.zalo!.includes(';')?' '+(i+1):''}</a>)}
             {profile.email&&<a className="button button-secondary" href={'mailto:'+encodeURIComponent(profile.email)}>Gửi email</a>}
+            {website&&<a className="button button-secondary" href={website} target="_blank" rel="noreferrer">Website doanh nghiệp ↗</a>}
           </div>
         </> : contactAccess===null ? <p role="status">Tính năng mở liên hệ đang được thiết lập. Bạn vẫn có thể xem năng lực và dịch vụ của doanh nghiệp.</p>
         : hasContact ? <><p>Mở đầu mối để trao đổi công việc trực tiếp với doanh nghiệp này.</p>
-          <ul className="company-contact-includes"><li>Người phụ trách và cách liên hệ</li><li>Điện thoại, email, Zalo nếu hồ sơ có</li><li>Địa chỉ doanh nghiệp</li></ul>
+          <ul className="company-contact-includes"><li>Người phụ trách và cách liên hệ</li><li>Điện thoại, email, Zalo nếu hồ sơ có</li><li>Địa chỉ và website doanh nghiệp nếu hồ sơ có</li></ul>
           <div className="company-contact-price"><strong>50 <span>POINT</span></strong><small>Trả một lần · Xem lại miễn phí</small></div>
           {actor?.status==='active' ? <details className="company-unlock-confirm"><summary>Mở thông tin liên hệ →</summary>
             <p>Trừ 50 POINT trong ví khi bạn xác nhận. Quyền xem áp dụng cho doanh nghiệp này.</p>
@@ -96,7 +92,7 @@ export default async function Page({params,searchParams}:Props) {
         <Link href={'/find-partners?'+new URLSearchParams({province,request:'1'})+'#dang-nhu-cau'}>Nhờ sàn giới thiệu →</Link></section>
     </aside></div>
     {related.length>0&&<section className="partner-card company-profile-section company-related"><h2>Doanh nghiệp cùng địa bàn {province}</h2><p>Tham khảo thêm các hồ sơ công khai để chọn đơn vị phù hợp.</p>
-      <ul className="partner-items">{related.map(row=><li key={row.id}><Link href={companyPath(row.id)}>{row.name}</Link><small>{companySummary(row.trade)}</small></li>)}</ul>
+      <ul className="partner-items">{related.map(row=><li key={row.id}><Link href={companyPath(row.id,row.publicSlug)}>{row.name}</Link><small>{companySummary(row.trade)}</small></li>)}</ul>
       <Link href={'/find-partners?'+new URLSearchParams({province})+'#ket-qua'}>Xem doanh nghiệp tại {province} →</Link></section>}
   </main>;
 }

@@ -1,4 +1,5 @@
-export const companyPath=(id:string)=>'/find-partners/companies/'+id;
+import {companyPublicPath} from './public-paths';
+export const companyPath=companyPublicPath;
 export function companySummary(value:string, max=150) {
   const text=value.replace(/\s+/g,' ').trim();
   if (text.length<=max) return text;
