@@ -2,10 +2,10 @@ import 'server-only';
 import {wardFilterAliases} from '../lib/projects/wards';
 import {and,asc,desc,eq,ilike,isNotNull,inArray,or,sql} from 'drizzle-orm';
 import {db} from '../db/client';
-import {companyContactAccess,partnerCompanies as companies} from '../db/schema';
+import {partnerCompanies as companies} from '../db/schema';
 import {companySearch,companySpecialties,type CompanySearchInput} from '../lib/site/company-search';
 import {partnerSchemaUnavailable} from './partner-requests';
-export async function listCompanyDirectory(input:CompanySearchInput,buyerId?:string) {
+export async function listCompanyDirectory(input:CompanySearchInput,_buyerId?:string) {
   const filters=companySearch(input);
   const year=sql`CASE WHEN ${companies.profile}->>'year' ~ '^[0-9]{4}$' THEN (${companies.profile}->>'year')::int ELSE 9999 END`;
   const terms=companySpecialties.find(([key])=>key===filters.specialty)?.[3].split(';')??[];
@@ -30,10 +30,6 @@ export async function listCompanyDirectory(input:CompanySearchInput,buyerId?:str
     .from(companies).where(where)
     .orderBy(...(filters.sort==='name_asc'?[asc(companies.name),asc(companies.id)]:filters.sort==='name_desc'?[desc(companies.name),asc(companies.id)]:filters.sort==='oldest'?[asc(companies.publishedAt),asc(companies.id)]:filters.sort==='established'?[asc(year),asc(companies.id)]:[desc(companies.publishedAt),desc(companies.id)])).limit(filters.size).offset((page-1)*filters.size)
     .catch(error=>{if(partnerSchemaUnavailable(error)) return [];throw error;});
-  const access=buyerId&&rows.length?await db.select({id:companyContactAccess.companyId}).from(companyContactAccess)
-    .where(and(eq(companyContactAccess.buyerId,buyerId),inArray(companyContactAccess.companyId,rows.map(row=>row.id))))
-    .catch(error=>{if(partnerSchemaUnavailable(error))return [];throw error;}):[];
-  const unlocked=new Set(access.map(row=>row.id));
-  return {data:rows.map(row=>({...row,unlocked:unlocked.has(row.id)})),pagination:{page,pageSize:filters.size,total,totalPages:pages}};
+  return {data:rows,pagination:{page,pageSize:filters.size,total,totalPages:pages}};
 }
 export type CompanyDirectoryResult=Awaited<ReturnType<typeof listCompanyDirectory>>;

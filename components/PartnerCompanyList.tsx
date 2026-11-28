@@ -28,12 +28,12 @@ export default function PartnerCompanyList({initial,queryString,requestHref}:{in
   }
   return <div>
     {rows.length ? <ul className="company-directory-list">
-      {rows.map(({id,publicSlug,name,trade,province,year,employees,market,unlocked})=>{
+      {rows.map(({id,publicSlug,name,trade,province,year,employees,market})=>{
         const detail=companyPath(id,publicSlug)+'?'+new URLSearchParams({q:keyword,province:provinceFilter,ward,page:String(page),sort,size:String(size),specialty,minYear,maxYear});
         return <li key={id}><article className="company-directory-row">
           <span className="company-directory-avatar" aria-hidden="true"><Icon name="industrial" size={28}/></span>
           <div className="company-directory-main">
-            <div className="company-directory-tags"><span>{province}</span>{unlocked&&<span className="company-access-badge">Đã mở liên hệ</span>}</div>
+            <div className="company-directory-tags"><span>{province}</span><span className="company-access-badge">Liên hệ miễn phí</span></div>
             <h3><Link href={detail}>{name}</Link></h3>
             <p className="company-directory-trade">{companySummary(trade)}</p>
             <dl className="company-directory-facts">
